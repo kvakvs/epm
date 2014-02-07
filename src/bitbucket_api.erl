@@ -1,23 +1,23 @@
-%% OMFG, this API sucks. 
+%% OMFG, this API sucks.
 %%
 %% explain to me how this is even remotely useful:
 %%	jacobvorreuter$ curl "http://api.bitbucket.org/1.0/repositories/?name=rebar"
 %%	{
-%%	    "count": 12, 
-%%	    "query": "rebar", 
+%%	    "count": 12,
+%%	    "query": "rebar",
 %%	    "repositories": [
 %%	        {
-%%	            "website": "", 
-%%	            "slug": "rebar", 
-%%	            "name": "rebar", 
-%%	            "followers_count": 0, 
+%%	            "website": "",
+%%	            "slug": "rebar",
+%%	            "name": "rebar",
+%%	            "followers_count": 0,
 %%	            "description": ""
-%%	        }, 
+%%	        },
 %%	        {
-%%	            "website": null, 
-%%	            "slug": "rebar", 
-%%	            "name": "rebar", 
-%%	            "followers_count": 0, 
+%%	            "website": null,
+%%	            "slug": "rebar",
+%%	            "name": "rebar",
+%%	            "followers_count": 0,
 %%	            "description": ""
 %%	        },
 %%			...
@@ -35,52 +35,55 @@
 -include("epm.hrl").
 
 package_deps(User, ProjectName, Vsn) ->
-    if
-        User == undefined -> ?EXIT("get_package_deps/3 user cannot be undefined",[]);
-        true -> ok
-    end,
-    if
-        ProjectName == undefined -> ?EXIT("get_package_deps/3 name cannot be undefined",[]);
-        true -> ok
-    end,
-    if
-        Vsn == undefined -> ?EXIT("get_package_deps/3 vsn cannot be undefined",[]);
-        true -> ok
-    end,
-    Url = lists:flatten(io_lib:format("http://bitbucket.org/~s/~s/raw/~s/~s.epm", [User, ProjectName, Vsn, ProjectName])),
-    case epm_util:request_as_str(Url, "bitbucket.org") of
-        Body when is_list(Body) -> proplists:get_value(deps, epm_util:eval(Body), []);
-        _ -> []
-    end.
- 
+  if
+    User == undefined ->
+      ?EXIT("get_package_deps/3 user cannot be undefined", []);
+    true -> ok
+  end,
+  if
+    ProjectName == undefined ->
+      ?EXIT("get_package_deps/3 name cannot be undefined", []);
+    true -> ok
+  end,
+  if
+    Vsn == undefined -> ?EXIT("get_package_deps/3 vsn cannot be undefined", []);
+    true -> ok
+  end,
+  Url = lists:flatten(io_lib:format("http://bitbucket.org/~s/~s/raw/~s/~s.epm", [User, ProjectName, Vsn, ProjectName])),
+  case epm_util:request_as_str(Url, "bitbucket.org") of
+    Body when is_list(Body) ->
+      proplists:get_value(deps, epm_util:eval(Body), []);
+    _ -> []
+  end.
+
 search(ProjectName) ->
-    case request_as_xml("http://bitbucket.org/repo/all/?name=" ++ ProjectName) of
-		{html,_,_}=Html ->
-			case search_xml_for_repos(Html) of
-				undefined -> [];
-				Repos -> extract_repo_info_from_html(Repos)
-			end;
-		Err ->
-			Err
-	end.
-	
-info(User, ProjectName) -> 
-	case search(ProjectName) of
-		[#repository{}|_]=Repos ->
-			case lists:filter(
-				fun(Repo) ->
-					Repo#repository.owner==User andalso
-					Repo#repository.name==ProjectName
-				end, Repos) of
-				[R|_] -> R;
-				_ -> undefined
-			end;
-		[] -> 
-			undefined;
-		Err ->
-			Err
-	end.
-	
+  case request_as_xml("http://bitbucket.org/repo/all/?name=" ++ ProjectName) of
+    {html, _, _} = Html ->
+      case search_xml_for_repos(Html) of
+        undefined -> [];
+        Repos -> extract_repo_info_from_html(Repos)
+      end;
+    Err ->
+      Err
+  end.
+
+info(User, ProjectName) ->
+  case search(ProjectName) of
+    [#repository{}|_] = Repos ->
+      case lists:filter(
+        fun(Repo) ->
+          Repo#repository.owner == User andalso
+            Repo#repository.name == ProjectName
+        end            , Repos) of
+        [R|_] -> R;
+        _ -> undefined
+      end;
+    [] ->
+      undefined;
+    Err ->
+      Err
+  end.
+
 tags(User, ProjectName) ->
     Xml = request_as_xml(lists:flatten(io_lib:format("http://api.bitbucket.org/1.0/repositories/~s/~s/tags/?format=xml", [User, ProjectName]))),
 	case Xml of
@@ -102,26 +105,26 @@ branches(User, ProjectName) ->
 download_package(Repo, Vsn) ->
     Url = lists:flatten(io_lib:format("http://bitbucket.org/~s/~s/get/~s.tar.gz", [Repo#repository.owner, Repo#repository.name, Vsn])),
 	epm_package:download_tarball(Repo, Url).
-					
+
 default_vsn() -> "tip".
 
 request_as_xml(Url) ->
-    case epm_util:request_as_str(Url, "bitbucket.org") of
-        Body when is_list(Body) ->
-            case yaws_html:h2e(Body) of
-				{ehtml,[],[_,Xml]} -> Xml;
-				_ -> poorly_formatted_xml
-			end;
-        Err ->
-            Err
-    end.
-    
+  case epm_util:request_as_str(Url, "bitbucket.org") of
+    Body when is_list(Body) ->
+      case yaws_html:h2e(Body) of
+        {ehtml, [], [_, Xml]} -> Xml;
+        _ -> poorly_formatted_xml
+      end;
+    Err ->
+      Err
+  end.
+
 %% fake xpaths
 
-search_xml_for_repos({'div',[{class,"repos-all"}|_],Repos}) -> 
+search_xml_for_repos({'div',[{class,"repos-all"}|_],Repos}) ->
 	Repos;
 search_xml_for_repos({_,_,Children}) ->
-	search_xml_for_repos(Children);	
+	search_xml_for_repos(Children);
 search_xml_for_repos([Child|Tail]) when not is_integer(Child) ->
 	case search_xml_for_repos(Child) of
 		undefined ->
@@ -132,24 +135,23 @@ search_xml_for_repos([Child|Tail]) when not is_integer(Child) ->
 search_xml_for_repos(_) -> undefined.
 
 extract_repo_info_from_html(Repos) ->
-	lists:foldl(
-		fun({'div',_,Props}, Acc) ->
-			case Props of
-				[{'div',_,_},{span,[],[{a,_,User},_,{a,_,RepoName}]},{br,_},Desc|_] ->
-					Desc1 = string:strip(re:replace(Desc, "[\\t\\n]", "", [global, {return, list}])),
-					Desc2 = 
-						case Desc1 of
-							"Clone URL" ++ _ -> undefined;
-							_ -> Desc1
-						end,
-					[#repository{
-						owner = User,
-						name = RepoName,
-						description = Desc2,
-						api_module = ?MODULE
-					}|Acc];
-				_ ->
-					Acc
-			end
-		end, [], lists:reverse(Repos)).
-		
+  lists:foldl(
+    fun({'div', _, Props}, Acc) ->
+      case Props of
+        [{'div', _, _}, {span, [], [{a, _, User}, _, {a, _, RepoName}]}, {br, _}, Desc|_] ->
+          Desc1 = string:strip(re:replace(Desc, "[\\t\\n]", "", [global, {return, list}])),
+          Desc2 =
+            case Desc1 of
+              "Clone URL" ++ _ -> undefined;
+              _ -> Desc1
+            end,
+          [#repository{
+            owner = User       ,
+            name = RepoName    ,
+            description = Desc2,
+            api_module = ?MODULE
+                      }|Acc];
+        _ ->
+          Acc
+      end
+    end, [], lists:reverse(Repos)).

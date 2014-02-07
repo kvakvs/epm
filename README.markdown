@@ -1,3 +1,9 @@
+# How did this project get here?
+
+http://hyperthunk.wordpress.com/2012/05/28/does-erlangotp-need-a-new-package-management-solution/
+
+--------------------
+
 ### epm _IS_
 * an Erlang package manager meant to have _minimal_ impact on projects
 * a simple and easy dependency tracker
@@ -11,13 +17,13 @@
 	curl "https://github.com/JacobVorreuter/epm/raw/master/epm" > epm
 	chmod +x epm
 	sudo mv epm /usr/local/bin/
-	
+
 	epm config --set build_dir "/tmp"
 	epm config --set install_dir "/Users/jvorreuter/erl_libs"
 	epm config --set proxy_host http://my.corporate.proxy
 	epm config --set proxy_port 80
 	epm config --set net_timeout 60000 # for a slow network...
-	
+
 ### Read the blog post
 
 <http://www.jkvor.com/erlang-package-manager>
@@ -77,7 +83,7 @@
              --get (default)
              --set <key> <value>
              --remove <key>
-	
+
 ### Do it
 
 tell epm where to install packages
@@ -86,8 +92,8 @@ tell epm where to install packages
 	epm v0.1.1, 2010
 
 	+ updated .epm config
-	
-search for an Erlang app  
+
+search for an Erlang app
 
 	jvorreuter$ ./epm search excavator
 	epm v0.1.1, 2010
@@ -98,7 +104,7 @@ search for an Erlang app
 	  name: excavator
 	  owner: JacobVorreuter
 	  followers: 7
-	  homepage: 
+	  homepage:
 	  description: An Erlang application for ingesting data from various sources (APIs, data feeds, web content, etc)
 	  tags:
 	    "0.3"
@@ -106,7 +112,7 @@ search for an Erlang app
 	    master
 	    scheduler
 
-install that app that you wanted (its dependencies will be installed too)  
+install that app that you wanted (its dependencies will be installed too)
 
 	jvorreuter$ ./epm install excavator
 	epm v0.1.1, 2010
@@ -142,7 +148,7 @@ install that app that you wanted (its dependencies will be installed too)
 	+ running excavator build command
 	+ running excavator install command
 
-get some info about that app you just installed  
+get some info about that app you just installed
 
 	jvorreuter$ ./epm info excavator
 	epm v0.1.1, 2010
@@ -154,16 +160,16 @@ get some info about that app you just installed
 	  owner: JacobVorreuter
 	  vsn: master
 	  install dir: /Users/jvorreuter/dev/excavator-0.3
-	  homepage: 
+	  homepage:
 	  description: An Erlang application for ingesting data from various sources (APIs, data feeds, web content, etc)
-	  dependencies: 
+	  dependencies:
 	    clones/mochiweb/master
 	    mochixpath/master
 	    dynamic_compile/master
 	    epm/etap/master
 	    mochiweb_server_behavior/master
 
-how 'bout a list of all apps I've installed?  
+how 'bout a list of all apps I've installed?
 
 	jvorreuter$ ./epm list
 	epm v0.1.1, 2010
@@ -175,9 +181,9 @@ how 'bout a list of all apps I've installed?
 	  owner: JacobVorreuter
 	  vsn: master
 	  install dir: /Users/jvorreuter/dev/excavator-0.3
-	  homepage: 
+	  homepage:
 	  description: An Erlang application for ingesting data from various sources (APIs, data feeds, web content, etc)
-	  dependencies: 
+	  dependencies:
 	    clones/mochiweb/master
 	    mochixpath/master
 	    dynamic_compile/master
@@ -195,23 +201,23 @@ how 'bout a list of all apps I've installed?
 	  owner: JacobVorreuter
 	  vsn: master
 	  install dir: /Users/jvorreuter/dev/dynamic_compile-0.1
-	  homepage: 
+	  homepage:
 	  description: compile and load erlang modules from string input
 
 	  name: mochiweb_server_behavior
 	  owner: JacobVorreuter
 	  vsn: master
 	  install dir: /Users/jvorreuter/dev/mochiweb_server_behavior-0.1
-	  homepage: 
+	  homepage:
 	  description: Erlang behavior for a simple mochiweb web server
-	  dependencies: 
+	  dependencies:
 	    clones/mochiweb/master
 
 	  name: etap
 	  owner: epm
 	  vsn: master
 	  install dir: /Users/jvorreuter/dev/etap-0.3.4
-	  homepage: 
+	  homepage:
 	  description: etap is a simple erlang testing library that provides TAP compliant output.
 
 	  name: mochiweb
@@ -234,4 +240,3 @@ what have I done? I must remove that terrible app. Its dependencies can stay tho
 	([y]/n) y
 
 	+ removing package JacobVorreuter-excavator-master from /Users/jvorreuter/dev/excavator-0.3
-	
