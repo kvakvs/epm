@@ -5,10 +5,9 @@
 
 execute(GlobalConfig0, ["install" | Args]) ->
   {GlobalConfig, Packages, Flags} = collect_args(install, Args, GlobalConfig0),
-  %% TODO: Remove put/get
-  put(verbose, lists:member(verbose, Flags)),
+  epm_cfg:set(verbose, lists:member(verbose, Flags)),
   Deps = epm_deps:package_dependencies(GlobalConfig, Packages),
-  {Installed, NotInstalled} = epm_cache:filter_installed_packages(Deps),
+  {Installed, NotInstalled} = epm_ops:filter_installed_packages(Deps),
   case NotInstalled of
     [] ->
       io:format("+ nothing to do: packages and dependencies already installed~n");
@@ -31,7 +30,7 @@ execute(GlobalConfig0, ["install" | Args]) ->
       case io:get_chars("", 1) of
         C when C == "y"; C == "\n" ->
           io:format("~n"),
-          [epm_cache:install_package(GlobalConfig, Package)
+          [epm_ops:install_package(GlobalConfig, Package)
             || Package <- NotInstalled];
         _ -> ok
       end
@@ -39,8 +38,8 @@ execute(GlobalConfig0, ["install" | Args]) ->
 
 execute(GlobalConfig0, ["remove" | Args]) ->
   {GlobalConfig, Packages, Flags} = collect_args(remove, Args, GlobalConfig0),
-  put(verbose, lists:member(verbose, Flags)),
-  Installed = epm_cache:installed_packages(Packages),
+  epm_cfg:set(verbose, lists:member(verbose, Flags)),
+  Installed = epm_ops:get_installed_packages(Packages),
   case Installed of
     [] ->
       io:format("+ nothing to remove: no matching packages installed~n");
@@ -54,7 +53,7 @@ execute(GlobalConfig0, ["remove" | Args]) ->
       case io:get_chars("", 1) of
         C when C == "y"; C == "\n" ->
           io:format("~n"),
-          [epm_cache:remove_package(GlobalConfig, Package)
+          [epm_ops:remove_package(GlobalConfig, Package)
             || Package <- Installed];
         _ -> ok
       end
@@ -62,8 +61,8 @@ execute(GlobalConfig0, ["remove" | Args]) ->
 
 execute(GlobalConfig0, ["update" | Args]) ->
   {GlobalConfig, Packages, Flags} = collect_args(update, Args, GlobalConfig0),
-  put(verbose, lists:member(verbose, Flags)),
-  Installed = epm_cache:installed_packages(Packages),
+  epm_cfg:set(verbose, lists:member(verbose, Flags)),
+  Installed = epm_ops:get_installed_packages(Packages),
   case Installed of
     [] ->
       io:format("- nothing to update~n");
@@ -77,7 +76,7 @@ execute(GlobalConfig0, ["update" | Args]) ->
       case io:get_chars("", 1) of
         C when C == "y"; C == "\n" ->
           io:format("~n"),
-          [epm_cache:update_package(GlobalConfig, Package)
+          [epm_ops:update_package(GlobalConfig, Package)
             || Package <- Installed];
         _ -> ok
       end
@@ -85,7 +84,7 @@ execute(GlobalConfig0, ["update" | Args]) ->
 
 execute(GlobalConfig0, ["info" | Args]) ->
   {GlobalConfig, Packages, _Flags} = collect_args(info, Args, GlobalConfig0),
-  {Installed, NotInstalled} = epm_cache:filter_installed_packages(Packages),
+  {Installed, NotInstalled} = epm_ops:filter_installed_packages(Packages),
   case Installed of
     [] -> ok;
     _ ->
@@ -99,7 +98,7 @@ execute(GlobalConfig0, ["info" | Args]) ->
             0 -> ok;
             _ -> io:format("~n")
           end,
-          epm_cache:print_installed_package_info(Package),
+          epm_ops:print_installed_package_info(Package),
           Count + 1
         end      , 0, lists:reverse(Installed))
   end,
@@ -111,17 +110,17 @@ execute(GlobalConfig0, ["info" | Args]) ->
         [] -> ok;
         _ -> io:format("~n")
       end,
-      epm_cache:print_not_installed_package_info(GlobalConfig
+      epm_ops:print_not_installed_package_info(GlobalConfig
                                                 , NotInstalled, true)
   end;
 
 execute(GlobalConfig0, ["search" | Args]) ->
   {GlobalConfig, Packages, _Flags} = collect_args(search, Args, GlobalConfig0),
-  epm_cache:print_not_installed_package_info(GlobalConfig
+  epm_ops:print_not_installed_package_info(GlobalConfig
                                             , lists:reverse(Packages));
 
 execute(_GlobalConfig, ["list" | _Args]) ->
-  Installed = epm_cache:installed_packages(),
+  Installed = epm_ops:installed_packages(),
   case Installed of
     [] ->
       io:format("- no packages installed~n");
@@ -136,7 +135,7 @@ execute(_GlobalConfig, ["list" | _Args]) ->
             0 -> ok;
             _ -> io:format("~n")
           end,
-          epm_cache:print_installed_package_info(Package),
+          epm_ops:print_installed_package_info(Package),
           Count + 1
         end      , 0, lists:reverse(Installed))
   end;
@@ -234,7 +233,7 @@ collect_args(Target, [Arg | Rest], GlobalConfig, Packages, Flags) ->
   case parse_tag(Target, Arg) of
     undefined -> %% if not a tag then must be a project name
       %% split into user and project
-      {ProjectName, User} = epm_cache:split_package(Arg),
+      {ProjectName, User} = epm_ops:split_package(Arg),
       collect_args(Target, Rest, GlobalConfig
                   , [#package{user = User, name = ProjectName}|Packages]
                   , Flags);
@@ -351,7 +350,7 @@ print_config_values(GlobalConfig) ->
 	[io:format("~p\t\t~p~n", [K,V]) || {K,V} <- GlobalConfig].
 
 write_config_file(GlobalConfig) ->
-  FileLoc = get(global_config),
+  {ok, FileLoc} = epm_cfg:get(global_config),
   case file:open(FileLoc, [write]) of
     {ok, IoDevice} ->
       io:format(IoDevice, "[~n", []),
@@ -369,7 +368,7 @@ write_config_file(GlobalConfig) ->
               io:format(IoDevice, "  {~p, ~p}", [Key, Val])
           end,
           Count + 1
-        end      , 0, GlobalConfig),
+        end, 0, GlobalConfig),
       io:format(IoDevice, "~n].~n", []),
       io:format("+ updated .epm config~n");
     {error, Reason} ->

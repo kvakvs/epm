@@ -1,17 +1,17 @@
 %%%-------------------------------------------------------------------
 %%% @author Dmytro Lytovchenko <dmytro.lytovchenko@gmail.com>
-%%% @doc Represents local index of packages and binary package storage
+%%% @doc Represents operations on package storage and remote storage
 %%% @end
 %%% Created : 07. Feb 2014 7:16 PM
 %%%-------------------------------------------------------------------
--module(epm_cache).
+-module(epm_ops).
 
 %% API
 -export([filter_installed_packages/1
         , retrieve_remote_repo/3
         , retrieve_remote_repos/4
         , installed_packages/0
-        , installed_packages/1
+        , get_installed_packages/1
         , split_package/1
         , read_vsn_from_args/2
         , print_not_installed_package_info/2
@@ -45,9 +45,9 @@ split_package([A | Tail], User) -> split_package(Tail, User ++ [A]).
 
 
 installed_packages() ->
-  [Package || [{_,Package}] <- dets:match(epm_index, '$1')].
+  [Package || [{_,Package}] <- epm_index:list_local_packages()].
 
-installed_packages(Packages) ->
+get_installed_packages(Packages) ->
   Installed = dict:to_list(installed_packages_internal(Packages, dict:new())),
   [V || {_K,V} <- Installed].
 
@@ -74,7 +74,7 @@ installed_packages_internal([Package|Tail], Dict) ->
 
 
 dependant_installed_packages(Package) ->
-  dependant_installed_packages(Package, [], dets:match(epm_index, '$1')).
+  dependant_installed_packages(Package, [], epm_index:list_local_packages()).
 
 dependant_installed_packages(_Package, Acc, []) -> Acc;
 dependant_installed_packages(#package{user = User
@@ -162,28 +162,28 @@ retrieve_remote_repos([Module|Tail], User, ProjectName, IsExact, Acc) ->
 local_package_info(#package{ user = none
                            , name = ProjectName
                            , vsn = undefined}) ->
-  case dets:match(epm_index, {{'_', ProjectName, '_'}, '$1'}) of
+  case epm_index:list_local_by('_', ProjectName, '_') of
     [] -> [];
     List -> [Package || [Package] <- List]
   end;
 local_package_info(#package{ user = none
                            , name = ProjectName
                            , vsn = Vsn}) ->
-  case dets:match(epm_index, {{'_', ProjectName, Vsn}, '$1'}) of
+  case epm_index:list_local_by('_', ProjectName, Vsn) of
     [] -> [];
     List -> [Package || [Package] <- List]
   end;
 local_package_info(#package{ user = User
                            , name = ProjectName
                            , vsn = undefined}) ->
-  case dets:match(epm_index, {{User, ProjectName, '_'}, '$1'}) of
+  case epm_index:list_local_by(User, ProjectName, '_') of
     [] -> [];
     List -> [Package || [Package] <- List]
   end;
 local_package_info(#package{ user = User
                            , name = ProjectName
                            , vsn = Vsn}) ->
-  case dets:match(epm_index, {{User, ProjectName, Vsn}, '$1'}) of
+  case epm_index:list_local_by(User, ProjectName, Vsn) of
     [] -> [];
     List -> [Package || [Package] <- List]
   end.
@@ -274,11 +274,49 @@ write_not_installed_package_info1(Packages, RepoPlugins, IsExact) ->
 fetch_not_installed_package_info([], _, Acc, _) -> Acc;
 fetch_not_installed_package_info([#package{user=User,name=ProjectName}|Tail]
                                 , RepoPlugins, Acc, IsExact) ->
-  Repos = epm_cache:retrieve_remote_repos(
+  Repos = epm_ops:retrieve_remote_repos(
     RepoPlugins, User, ProjectName, IsExact),
   fetch_not_installed_package_info(
     Tail, RepoPlugins, lists:append(Acc, Repos), IsExact).
 
+
+%% -----------------------------------------------------------------------------
+%% REMOVE
+%% -----------------------------------------------------------------------------
+remove_package(_GlobalConfig, #package{ user = User
+                                      , name = Name
+                                      , vsn = Vsn
+                                      , install_dir = InstallDir}) ->
+  io:format("+ removing package ~s-~s-~s from ~s~n"
+           , [User, Name, Vsn, InstallDir]),
+  RemoveCmd = "rm -rf " ++ InstallDir,
+  epm_util:print_cmd_output("~s~n", [RemoveCmd]),
+  epm_util:do_cmd(RemoveCmd, fail),
+  epm_index:delete_local({User, Name, Vsn}).
+
+%% -----------------------------------------------------------------------------
+%% UPDATE
+%% -----------------------------------------------------------------------------
+update_package(GlobalConfig, Package) ->
+  Repo = Package#package.repo,
+  Vsn = Package#package.vsn,
+  %% switch to build home dir
+  epm_util:set_cwd_build_home(GlobalConfig),
+
+  %% download correct version of package
+  LocalProjectDir = apply(Repo#repository.api_module, download_package
+                         , [Repo, Vsn]),
+
+  %% switch to project dir
+  epm_util:set_cwd_build_home(GlobalConfig),
+  epm_util:set_cwd(LocalProjectDir),
+
+  %% build/install project
+  %_InstallDir = build_project(GlobalConfig, Package),
+
+  %% switch to build home dir and delete cloned project
+  epm_util:set_cwd_build_home(GlobalConfig),
+  epm_util:del_dir(LocalProjectDir).
 
 
 %% -----------------------------------------------------------------------------
@@ -306,44 +344,9 @@ install_package(GlobalConfig, Package) ->
   epm_util:set_cwd_build_home(GlobalConfig),
   epm_util:del_dir(LocalProjectDir),
 
-  dets:insert(epm_index, {{User, Name, Vsn}, Package#package{install_dir = InstallDir}}),
-
+  Package1 = Package#package{install_dir = InstallDir},
+  epm_index:insert_local({User, Name, Vsn}, Package1),
   ok.
-
-%% -----------------------------------------------------------------------------
-%% REMOVE
-%% -----------------------------------------------------------------------------
-remove_package(_GlobalConfig, #package{user = User, name = Name, vsn = Vsn, install_dir = InstallDir}) ->
-  io:format("+ removing package ~s-~s-~s from ~s~n", [User, Name, Vsn, InstallDir]),
-  RemoveCmd = "rm -rf " ++ InstallDir,
-  epm_util:print_cmd_output("~s~n", [RemoveCmd]),
-  epm_util:do_cmd(RemoveCmd, fail),
-  dets:delete(epm_index, {User, Name, Vsn}).
-
-%% -----------------------------------------------------------------------------
-%% UPDATE
-%% -----------------------------------------------------------------------------
-update_package(GlobalConfig, Package) ->
-  Repo = Package#package.repo,
-  Vsn = Package#package.vsn,
-  %% switch to build home dir
-  epm_util:set_cwd_build_home(GlobalConfig),
-
-  %% download correct version of package
-  LocalProjectDir = apply(Repo#repository.api_module, download_package
-                         , [Repo, Vsn]),
-
-  %% switch to project dir
-  epm_util:set_cwd_build_home(GlobalConfig),
-  epm_util:set_cwd(LocalProjectDir),
-
-  %% build/install project
-  %_InstallDir = build_project(GlobalConfig, Package),
-
-  %% switch to build home dir and delete cloned project
-  epm_util:set_cwd_build_home(GlobalConfig),
-  epm_util:del_dir(LocalProjectDir).
-
 
 install(ProjectName, Config, undefined) ->
   install(ProjectName, Config, code:lib_dir());

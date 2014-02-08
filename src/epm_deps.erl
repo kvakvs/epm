@@ -27,7 +27,7 @@ package_dependencies(GlobalConfig, Packages) ->
 %% @private
 package_dependencies1([], _, _, _, Dict) -> Dict;
 package_dependencies1([Package|Tail], RepoPlugins, G, Parent, Dict) ->
-  Repo = epm_cache:retrieve_remote_repo(
+  Repo = epm_ops:retrieve_remote_repo(
     RepoPlugins, Package#package.user, Package#package.name),
   WithoutDeps = lists:member(without_deps, Package#package.args),
   Key = {Repo#repository.owner, Repo#repository.name, Package#package.vsn},
@@ -59,8 +59,8 @@ package_dependencies1([Package|Tail], RepoPlugins, G, Parent, Dict) ->
         Deps0 = apply(Repo#repository.api_module, package_deps
                      , [Repo#repository.owner, Repo#repository.name, PkgVsn]),
         F = fun({Dep, Args}, TempDict) ->
-            {DepName, DepUser} = epm_cache:split_package(Dep),
-            DepVsn = epm_cache:read_vsn_from_args(
+            {DepName, DepUser} = epm_ops:split_package(Dep),
+            DepVsn = epm_ops:read_vsn_from_args(
               Args, apply(Repo#repository.api_module, default_vsn, [])),
             Package0 = #package{user = DepUser
                                , name = DepName

@@ -9,16 +9,16 @@ home_dir() ->
 	end.
 
 set_http_proxy(Host, Port) when Host =:= none orelse Port =:= none ->
-    ignored;
+  ignored;
 set_http_proxy(Host, Port) when is_list(Port) ->
-    set_http_proxy(Host, list_to_integer(Port));
+  set_http_proxy(Host, list_to_integer(Port));
 set_http_proxy(Host, Port) when is_integer(Port) ->
-    put(proxy_host, Host), put(proxy_port, Port).
+  epm_cfg:set(proxy_host, Host), put(proxy_port, Port).
 
 set_net_timeout(Timeout) when is_list(Timeout) ->
-    set_net_timeout(list_to_integer(Timeout));
+  set_net_timeout(list_to_integer(Timeout));
 set_net_timeout(Timeout) when is_integer(Timeout) ->
-    put(net_timeout, Timeout).
+  epm_cfg:set(net_timeout, Timeout).
 
 request_as_str(Url, Host) ->
   case http_request(Url, Host) of
@@ -41,7 +41,7 @@ http_request(Url, Host) ->
 http_request(Url, Host, ClientOpts) ->
   Hdrs = make_headers(Host),
   Opts = http_options(ClientOpts),
-  Timeout = get(net_timeout),
+  {ok, Timeout} = epm_cfg:get(net_timeout),
   case ibrowse:send_req(Url, Hdrs, get, [], Opts, Timeout) of
     {ok, "302", Headers, _} = Response ->
       case proplists:get_value("Location", Headers) of
@@ -57,23 +57,24 @@ http_options(ClientOpts) ->
     proxy_options() ++ ClientOpts.
 
 proxy_options() ->
-  case get(proxy_host) of
-    undefined -> [];
-    Host ->
-      Port = case get(proxy_port) of
-               none -> 8080;
-               PortNum -> PortNum
+  case epm_cfg:get(proxy_host) of
+    {error, not_found} -> [];
+    {ok, Host} ->
+      Port = case epm_cfg:get(proxy_port) of
+               {error, not_found} -> 8080;
+               {ok, PortNum} -> PortNum
              end,
       [{proxy_host, Host}, {proxy_port, Port}]
   end.
 
 make_headers(undefined) ->
-    [{"User-Agent", "EPM"}];
+  [{"User-Agent", "Erlang EPM v" ++ ?epm_version}];
 make_headers(Host) ->
-    [{"User-Agent", "EPM"}, {"Host", Host}].
+  [{"User-Agent", "Erlang EPM v" ++ ?epm_version}, {"Host", Host}].
 
 default_http_options() ->
-    [{timeout, get(net_timeout)}].
+  {ok, T} = epm_cfg:get(net_timeout),
+  [{timeout, T}].
 
 epm_home_dir(Home) ->
   EPM = filename:join([Home, "epm"]),
@@ -85,43 +86,6 @@ epm_home_dir(Home) ->
         {error, Reason} ->
           ?EXIT("failed to create epm home directory (~s): ~p", [EPM, Reason])
       end
-  end.
-
-open_dets_table(Home, EpmHome) ->
-  File = filename:join([EpmHome, "epm_index"]),
-
-  %% TODO: delete this later
-  Insert =
-    case filelib:is_regular(filename:join([Home, "epm_index"])) of
-      true ->
-        case dets:open_file(epm_index, [{type, set}, {file, filename:join([Home, "epm_index"])}]) of
-          {ok, _} ->
-            Rows = dets:match(epm_index, '$1'),
-            dets:close(epm_index),
-
-            [{{User, Name, Vsn}, #package{
-              user = User             ,
-              name = Name             ,
-              vsn = Vsn               ,
-              install_dir = InstallDir,
-              deps = Deps             ,
-              repo = github_api:info(User, Name)
-                                         }} || [{{User, Name, Vsn}, InstallDir, Deps}] <- Rows];
-          _ -> []
-        end;
-      false -> []
-    end,
-
-  case dets:open_file(epm_index, [{type, set}, {file, File}]) of
-    {ok, _} ->
-      %% TODO: delete this later
-      [dets:insert(epm_index, I) || I <- Insert],
-      file:delete(filename:join([Home, "epm_index"])),
-      ok;
-    {error, {file_error, _, eacces}} ->
-      ?EXIT("insufficient access to epm index file: ~s", [File]);
-    {error, Reason} ->
-      ?EXIT("failed to open epm index file (~s): ~p", [File, Reason])
   end.
 
 %% TODO: Bleeding eyes
@@ -209,9 +173,9 @@ do_cmd(Cmd) ->
     {list_to_integer(ExitCode), string:join(lists:reverse(Other), "\n")}.
 
 print_cmd_output(Format, Args) ->
-	case get(verbose) of
-		undefined -> print_cmd_output(Format, Args, false);
-		Verbose -> print_cmd_output(Format, Args, Verbose)
+	case epm_cfg:get(verbose) of
+    {error, not_found} -> print_cmd_output(Format, Args, false);
+    {ok, Verbose}      -> print_cmd_output(Format, Args, Verbose)
 	end.
 
 print_cmd_output(_, _, false) -> ok; %% do not print verbose output

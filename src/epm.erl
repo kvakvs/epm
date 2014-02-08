@@ -3,10 +3,6 @@
 -include("epm.hrl").
 
 main(Args) ->
-  %% TODO: Remove put/get
-  put(vsn, ?epm_version),
-  io:format("epm v~s, ~p~n~n", [?epm_version, ?epm_year]),
-
   application:load(sasl),
   application:set_env(sasl, sasl_error_logger, false),
   lists:map(fun application:start/1, [sasl, crypto, public_key, ssl, ibrowse, epm]),
@@ -20,20 +16,22 @@ main(Args) ->
       ok
   end,
 
-  dets:close(epm_index),
+  epm_index:close(),
 	io:format("~n").
 
 main_internal(Args) ->
   Home = epm_util:home_dir(),
   EpmHome = epm_util:epm_home_dir(Home),
-  epm_util:open_dets_table(Home, EpmHome),
+  epm_util:open(Home, EpmHome),
 
   %% consult global .epm config file in home directory
   case file:path_consult(["."] ++ Home ++ [code:root_dir()], ".epm") of
     {ok, [GlobalConfig], FileLoc} ->
 
-      %% TODO: Remove put/get
-      put(global_config, FileLoc),
+      epm_cfg:init(GlobalConfig),
+      epm_cfg:set(global_config, FileLoc),
+      epm_cfg:set(vsn, ?epm_version),
+      io:format("epm v~s, ~p~n~n", [?epm_version, ?epm_year]),
 
       case proplists:get_value(install_dir, GlobalConfig) of
         undefined ->
@@ -51,11 +49,13 @@ main_internal(Args) ->
 
       epm_core:execute(GlobalConfig, Args);
     {ok, [], FileLoc} ->
-      put(global_config, FileLoc),
+      epm_cfg:init([]),
+      epm_cfg:set(global_config, FileLoc),
       epm_core:execute([], Args);
     {error, enoent} ->
       file:write_file(filename:join([Home, ".epm"]), <<>>),
-      put(global_config, filename:join([Home, ".epm"])),
+      epm_cfg:init([]),
+      epm_cfg:set(global_config, filename:join([Home, ".epm"])),
       epm_core:execute([], Args);
     {error, Reason} ->
       ?EXIT("failed to read epm global config: ~p", [Reason])
