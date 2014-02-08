@@ -10,12 +10,13 @@
 -export([filter_installed_packages/1
         , retrieve_remote_repo/3
         , retrieve_remote_repos/4
-        , installed_packages/0
+        , installed_packages/1
         , get_installed_packages/1
         , split_package/1
         , read_vsn_from_args/2
-        , print_not_installed_package_info/2
         , print_installed_package_info/1
+        , print_not_installed_package_info/2
+        , print_not_installed_package_info/3
         , update_package/2
         , remove_package/2
         , install_package/2
@@ -44,7 +45,7 @@ split_package([47 | Package], User) -> {Package, User};
 split_package([A | Tail], User) -> split_package(Tail, User ++ [A]).
 
 
-installed_packages() ->
+installed_packages(_State=#epm_state{}) ->
   [Package || [{_,Package}] <- epm_index:list_local_packages()].
 
 get_installed_packages(Packages) ->
@@ -61,9 +62,9 @@ installed_packages_internal([Package|Tail], Dict) ->
         Dict;
       List ->
         FoldF = fun(InstalledPackage, TempDict) ->
-          NewValue = { InstalledPackage#package.user
-                     , InstalledPackage#package.name
-                     , InstalledPackage#package.vsn },
+          NewValue = { InstalledPackage#epm_package.user
+                     , InstalledPackage#epm_package.name
+                     , InstalledPackage#epm_package.vsn },
           TempDict1 = dict:store(NewValue, InstalledPackage, TempDict),
           DependantPackages = dependant_installed_packages(InstalledPackage),
           installed_packages_internal(DependantPackages, TempDict1)
@@ -77,11 +78,11 @@ dependant_installed_packages(Package) ->
   dependant_installed_packages(Package, [], epm_index:list_local_packages()).
 
 dependant_installed_packages(_Package, Acc, []) -> Acc;
-dependant_installed_packages(#package{user = User
+dependant_installed_packages(#epm_package       {user = User
                                      , name = Name
                                      , vsn = Vsn} = Package
                     , Acc
-                    , [[{_, #package{deps = Deps} = InstalledPackage}]|Tail]) ->
+                    , [[{_, #epm_package{deps = Deps} = InstalledPackage}]|Tail]) ->
   F = fun({U, N, V}) ->
     (U == User orelse U == none) andalso
       (N == Name) andalso
@@ -102,7 +103,7 @@ retrieve_remote_repo([Module|Tail], none, ProjectName) ->
     [] ->
       retrieve_remote_repo(Tail, none, ProjectName);
     Repos when is_list(Repos) ->
-      case lists:filter(fun(R1) -> R1#repository.name == ProjectName end
+      case lists:filter(fun(R1) -> R1#epm_repo.name == ProjectName end
                        , Repos) of
         [R0|_] -> R0;
         [] -> retrieve_remote_repo(Tail, none, ProjectName)
@@ -113,7 +114,7 @@ retrieve_remote_repo([Module|Tail], none, ProjectName) ->
 
 retrieve_remote_repo([Module|Tail], User, ProjectName) ->
   case apply(Module, info, [User, ProjectName]) of
-    Repo when is_record(Repo, repository) ->
+    Repo when is_record(Repo, epm_repo) ->
       Repo;
     undefined ->
       retrieve_remote_repo(Tail, User, ProjectName);
@@ -131,7 +132,7 @@ retrieve_remote_repos([Module|Tail], none, ProjectName, IsExact, Acc) ->
     [] ->
       retrieve_remote_repos(Tail, none, ProjectName, IsExact, Acc);
     Repos when is_list(Repos), IsExact == true ->
-      case lists:filter(fun(R1) -> R1#repository.name == ProjectName end
+      case lists:filter(fun(R1) -> R1#epm_repo.name == ProjectName end
                        , Repos) of
         [] -> retrieve_remote_repos(Tail, none, ProjectName, IsExact, Acc);
         R0s ->
@@ -147,7 +148,7 @@ retrieve_remote_repos([Module|Tail], none, ProjectName, IsExact, Acc) ->
 
 retrieve_remote_repos([Module|Tail], User, ProjectName, IsExact, Acc) ->
   case apply(Module, info, [User, ProjectName]) of
-    Repo when is_record(Repo, repository) ->
+    Repo when is_record(Repo, epm_repo) ->
       retrieve_remote_repos(Tail, User, ProjectName, IsExact, Acc ++ [Repo]);
     undefined ->
       retrieve_remote_repos(Tail, User, ProjectName, IsExact, Acc);
@@ -159,28 +160,29 @@ retrieve_remote_repos([Module|Tail], User, ProjectName, IsExact, Acc) ->
 %% package info
 %% -----------------------------------------------------------------------------
 %% @private
-local_package_info(#package{ user = none
+-spec local_package_info(#epm_package{}) -> list().
+local_package_info(#epm_package{ user = none
                            , name = ProjectName
                            , vsn = undefined}) ->
   case epm_index:list_local_by('_', ProjectName, '_') of
     [] -> [];
     List -> [Package || [Package] <- List]
   end;
-local_package_info(#package{ user = none
+local_package_info(#epm_package{ user = none
                            , name = ProjectName
                            , vsn = Vsn}) ->
   case epm_index:list_local_by('_', ProjectName, Vsn) of
     [] -> [];
     List -> [Package || [Package] <- List]
   end;
-local_package_info(#package{ user = User
+local_package_info(#epm_package{ user = User
                            , name = ProjectName
                            , vsn = undefined}) ->
   case epm_index:list_local_by(User, ProjectName, '_') of
     [] -> [];
     List -> [Package || [Package] <- List]
   end;
-local_package_info(#package{ user = User
+local_package_info(#epm_package{ user = User
                            , name = ProjectName
                            , vsn = Vsn}) ->
   case epm_index:list_local_by(User, ProjectName, Vsn) of
@@ -201,18 +203,19 @@ read_vsn_from_args([], Default) -> Default.
 %% -----------------------------------------------------------------------------
 %% Print package info
 %% -----------------------------------------------------------------------------
+-spec print_installed_package_info(#epm_package{}) -> any().
 print_installed_package_info(Package) ->
-  Repo = Package#package.repo,
+  Repo = Package#epm_package.repo,
   [io:format("  ~s: ~s~n", [Field, if Value==undefined -> ""; true -> Value end]) || {Field, Value} <- [
-    {"name", Repo#repository.name},
-    {"owner", Repo#repository.owner},
-    {"vsn", Package#package.vsn},
-    {"pushed", Repo#repository.pushed},
-    {"install dir", Package#package.install_dir},
-    {"homepage", Repo#repository.homepage},
-    {"description", Repo#repository.description}
+    {"name", Repo#epm_repo.name},
+    {"owner", Repo#epm_repo.owner},
+    {"vsn", Package#epm_package.vsn},
+    {"pushed", Repo#epm_repo.pushed},
+    {"install dir", Package#epm_package.install_dir},
+    {"homepage", Repo#epm_repo.homepage},
+    {"description", Repo#epm_repo.description}
                                                                                                        ]],
-  case Package#package.deps of
+  case Package#epm_package.deps of
     [] -> ok;
     Deps ->
       io:format("  dependencies: ~n    ~s~n", [string:join([
@@ -222,14 +225,14 @@ print_installed_package_info(Package) ->
         end || {U,N,V} <- Deps], "\n    ")])
   end.
 
-print_not_installed_package_info(GlobalConfig, Packages) ->
-  print_not_installed_package_info(GlobalConfig, Packages, false).
+print_not_installed_package_info(State=#epm_state{}, Packages) ->
+  print_not_installed_package_info(State, Packages, false).
 
-print_not_installed_package_info(GlobalConfig, Packages, IsExact) ->
-  RepoPlugins = proplists:get_value(repo_plugins, GlobalConfig, ?DEFAULT_API_MODULES),
-  write_not_installed_package_info1(Packages, RepoPlugins, IsExact).
+print_not_installed_package_info(_State=#epm_state{}, Packages, IsExact) ->
+  RepoPlugins = epm_cfg:get(repo_plugins, ?DEFAULT_API_MODULES),
+  print_not_installed_internal(Packages, RepoPlugins, IsExact).
 
-write_not_installed_package_info1(Packages, RepoPlugins, IsExact) ->
+print_not_installed_internal(Packages, RepoPlugins, IsExact) ->
   case fetch_not_installed_package_info(Packages, RepoPlugins, [], IsExact) of
     [] ->
       io:format("- not found~n");
@@ -239,24 +242,27 @@ write_not_installed_package_info1(Packages, RepoPlugins, IsExact) ->
       io:format("===============================~n"),
       lists:foldl(
         fun(Repo, Count) ->
-          Tags = apply(Repo#repository.api_module, tags, [Repo#repository.owner, Repo#repository.name]),
-          Branches = apply(Repo#repository.api_module, branches, [Repo#repository.owner, Repo#repository.name]),
+          Tags = apply(Repo#epm_repo.api_module, tags
+                      , [Repo#epm_repo.owner, Repo#epm_repo.name]),
+          Branches = apply(Repo#epm_repo.api_module, branches
+                          , [Repo#epm_repo.owner, Repo#epm_repo.name]),
           case Count of
             0 -> ok;
             _ -> io:format("~n")
           end,
-          [io:format("  ~s: ~s~n", [Field, if Value == undefined -> ""; true ->
-            Value end              ]) || {Field, Value} <- [
-            {"name", Repo#repository.name}                 ,
-            {"owner", Repo#repository.owner}               ,
-            {"followers", Repo#repository.followers}       ,
-            {"pushed", Repo#repository.pushed}             ,
-            {"homepage", Repo#repository.homepage}         ,
-            {"description", Repo#repository.description}   ,
-            {"repo plugin", atom_to_list(Repo#repository.api_module)}
+          [io:format("  ~s: ~s~n"
+                    , [Field
+                      , if Value == undefined -> ""; true -> Value end
+                      ]) || {Field, Value} <- [
+            {"name", Repo#epm_repo.name}                 ,
+            {"owner", Repo#epm_repo.owner}               ,
+            {"followers", Repo#epm_repo.followers}       ,
+            {"pushed", Repo#epm_repo.pushed}             ,
+            {"homepage", Repo#epm_repo.homepage}         ,
+            {"description", Repo#epm_repo.description}   ,
+            {"repo plugin", atom_to_list(Repo#epm_repo.api_module)}
                                                            ]],
-          if
-            Tags =/= [] ->
+          if Tags =/= [] ->
               io:format("  tags:~n"),
               [io:format("    ~s~n", [Tag]) || Tag <- Tags];
             true -> ok
@@ -272,7 +278,7 @@ write_not_installed_package_info1(Packages, RepoPlugins, IsExact) ->
   end.
 
 fetch_not_installed_package_info([], _, Acc, _) -> Acc;
-fetch_not_installed_package_info([#package{user=User,name=ProjectName}|Tail]
+fetch_not_installed_package_info([#epm_package{user=User,name=ProjectName}|Tail]
                                 , RepoPlugins, Acc, IsExact) ->
   Repos = epm_ops:retrieve_remote_repos(
     RepoPlugins, User, ProjectName, IsExact),
@@ -283,70 +289,75 @@ fetch_not_installed_package_info([#package{user=User,name=ProjectName}|Tail]
 %% -----------------------------------------------------------------------------
 %% REMOVE
 %% -----------------------------------------------------------------------------
-remove_package(_GlobalConfig, #package{ user = User
-                                      , name = Name
-                                      , vsn = Vsn
-                                      , install_dir = InstallDir}) ->
+-spec remove_package(#epm_state{}, #epm_package{}) -> #epm_state{}.
+remove_package(State=#epm_state{}, #epm_package{ user = User
+                                          , name = Name
+                                          , vsn = Vsn
+                                          , install_dir = InstallDir}) ->
   io:format("+ removing package ~s-~s-~s from ~s~n"
            , [User, Name, Vsn, InstallDir]),
   RemoveCmd = "rm -rf " ++ InstallDir,
   epm_util:print_cmd_output("~s~n", [RemoveCmd]),
   epm_util:do_cmd(RemoveCmd, fail),
-  epm_index:delete_local({User, Name, Vsn}).
+  epm_index:delete_local({User, Name, Vsn}),
+  State.
 
 %% -----------------------------------------------------------------------------
 %% UPDATE
 %% -----------------------------------------------------------------------------
-update_package(GlobalConfig, Package) ->
-  Repo = Package#package.repo,
-  Vsn = Package#package.vsn,
+-spec update_package(#epm_state{}, #epm_package{}) -> #epm_state{}.
+update_package(State=#epm_state{}, Package=#epm_package{}) ->
+  Repo = Package#epm_package.repo,
+  Vsn = Package#epm_package.vsn,
   %% switch to build home dir
-  epm_util:set_cwd_build_home(GlobalConfig),
+  epm_util:set_cwd_build_home(State),
 
   %% download correct version of package
-  LocalProjectDir = apply(Repo#repository.api_module, download_package
+  LocalProjectDir = apply(Repo#epm_repo.api_module, download_package
                          , [Repo, Vsn]),
 
   %% switch to project dir
-  epm_util:set_cwd_build_home(GlobalConfig),
+  epm_util:set_cwd_build_home(State),
   epm_util:set_cwd(LocalProjectDir),
 
   %% build/install project
   %_InstallDir = build_project(GlobalConfig, Package),
 
   %% switch to build home dir and delete cloned project
-  epm_util:set_cwd_build_home(GlobalConfig),
-  epm_util:del_dir(LocalProjectDir).
+  epm_util:set_cwd_build_home(State),
+  epm_util:del_dir(LocalProjectDir),
+  State.
 
 
 %% -----------------------------------------------------------------------------
 %% INSTALL
 %% -----------------------------------------------------------------------------
-install_package(GlobalConfig, Package) ->
-  Repo = Package#package.repo,
-  User = Repo#repository.owner,
-  Name = Repo#repository.name,
-  Vsn = Package#package.vsn,
+-spec install_package(#epm_state{}, #epm_package{}) -> #epm_state{}.
+install_package(State=#epm_state{}, Package=#epm_package{}) ->
+  Repo = Package#epm_package.repo,
+  User = Repo#epm_repo.owner,
+  Name = Repo#epm_repo.name,
+  Vsn = Package#epm_package.vsn,
   %% switch to build home dir
-  epm_util:set_cwd_build_home(GlobalConfig),
+  epm_util:set_cwd_build_home(State),
 
   %% download correct version of package
-  LocalProjectDir = apply(Repo#repository.api_module, download_package, [Repo, Vsn]),
+  LocalProjectDir = apply(Repo#epm_repo.api_module, download_package, [Repo, Vsn]),
 
   %% switch to project dir
-  epm_util:set_cwd_build_home(GlobalConfig),
+  epm_util:set_cwd_build_home(State),
   epm_util:set_cwd(LocalProjectDir),
 
   %% build/install project
-  InstallDir = "not-building-anything", %build_project(GlobalConfig, Package),
+  InstallDir = "not-building-anything", %build_project(State, Package),
 
   %% switch to build home dir and delete cloned project
-  epm_util:set_cwd_build_home(GlobalConfig),
+  epm_util:set_cwd_build_home(State),
   epm_util:del_dir(LocalProjectDir),
 
-  Package1 = Package#package{install_dir = InstallDir},
+  Package1 = Package#epm_package{install_dir = InstallDir},
   epm_index:insert_local({User, Name, Vsn}, Package1),
-  ok.
+  State.
 
 install(ProjectName, Config, undefined) ->
   install(ProjectName, Config, code:lib_dir());

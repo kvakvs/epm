@@ -7,30 +7,29 @@
 -module(epm_deps).
 
 %% API
--export([package_dependencies/2]).
+-export([package_dependencies/1]).
 
 -include("epm.hrl").
 
 %% -----------------------------------------------------------------------------
 %% Compile list of dependencies
 %% -----------------------------------------------------------------------------
-package_dependencies(GlobalConfig, Packages) ->
-  RepoPlugins = proplists:get_value(repo_plugins, GlobalConfig
-                                   , ?DEFAULT_API_MODULES),
+package_dependencies(Packages) ->
+  RepoPlugins = epm_cfg:get(repo_plugins, ?DEFAULT_API_MODULES),
   G = digraph:new(),
-  UpdatedPackages = package_dependencies1(Packages, RepoPlugins, G, undefined
-                                         , dict:new()),
+  UpdatedPackages = package_dependencies_internal(
+                              Packages, RepoPlugins, G, undefined, dict:new()),
   Deps = digraph_utils:topsort(G),
   digraph:delete(G),
   [dict:fetch(Dep, UpdatedPackages) || Dep <- Deps].
 
 %% @private
-package_dependencies1([], _, _, _, Dict) -> Dict;
-package_dependencies1([Package|Tail], RepoPlugins, G, Parent, Dict) ->
+package_dependencies_internal([], _, _, _, Dict) -> Dict;
+package_dependencies_internal([Package|Tail], RepoPlugins, G, Parent, Dict) ->
   Repo = epm_ops:retrieve_remote_repo(
-    RepoPlugins, Package#package.user, Package#package.name),
-  WithoutDeps = lists:member(without_deps, Package#package.args),
-  Key = {Repo#repository.owner, Repo#repository.name, Package#package.vsn},
+    RepoPlugins, Package#epm_package.user, Package#epm_package.name),
+  WithoutDeps = lists:member(without_deps, Package#epm_package.args),
+  Key = {Repo#epm_repo.owner, Repo#epm_repo.name, Package#epm_package.vsn},
 
   digraph:add_vertex(G, Key),
 
@@ -41,14 +40,14 @@ package_dependencies1([Package|Tail], RepoPlugins, G, Parent, Dict) ->
       case digraph_utils:is_acyclic(G) of
         true  -> ok;
         false -> ?EXIT("circular dependency detected: ~s <--> ~s"
-                      , [ParentProjectName, Repo#repository.name])
+                      , [ParentProjectName, Repo#epm_repo.name])
       end
   end,
 
   PkgVsn =
-    case Package#package.vsn of
-      undefined -> apply(Repo#repository.api_module, default_vsn, []);
-      _ -> Package#package.vsn
+    case Package#epm_package.vsn of
+      undefined -> apply(Repo#epm_repo.api_module, default_vsn, []);
+      _ -> Package#epm_package.vsn
     end,
 
   {Deps, Dict1} =
@@ -56,27 +55,27 @@ package_dependencies1([Package|Tail], RepoPlugins, G, Parent, Dict) ->
       true ->
         {[], Dict};
       false ->
-        Deps0 = apply(Repo#repository.api_module, package_deps
-                     , [Repo#repository.owner, Repo#repository.name, PkgVsn]),
+        Deps0 = apply(Repo#epm_repo.api_module, package_deps
+                     , [Repo#epm_repo.owner, Repo#epm_repo.name, PkgVsn]),
         F = fun({Dep, Args}, TempDict) ->
             {DepName, DepUser} = epm_ops:split_package(Dep),
             DepVsn = epm_ops:read_vsn_from_args(
-              Args, apply(Repo#repository.api_module, default_vsn, [])),
-            Package0 = #package{user = DepUser
+              Args, apply(Repo#epm_repo.api_module, default_vsn, [])),
+            Package0 = #epm_package          {user = DepUser
                                , name = DepName
                                , vsn = DepVsn
                                , args = Args },
-            TempDict1 = package_dependencies1([Package0], RepoPlugins, G, Key
+            TempDict1 = package_dependencies_internal([Package0], RepoPlugins, G, Key
                                              , TempDict),
             {{DepUser, DepName, DepVsn}, TempDict1}
           end,
         lists:mapfoldl(F, Dict, Deps0)
     end,
 
-  Package1 = Package#package{ user = Repo#repository.owner
-                            , name = Repo#repository.name
+  Package1 = Package#epm_package{ user = Repo#epm_repo.owner
+                            , name = Repo#epm_repo.name
                             , vsn = PkgVsn
                             , deps = Deps
                             , repo = Repo },
-  package_dependencies1(Tail, RepoPlugins, G, Parent
+  package_dependencies_internal(Tail, RepoPlugins, G, Parent
                        , dict:store(Key, Package1, Dict1)).

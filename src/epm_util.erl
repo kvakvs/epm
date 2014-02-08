@@ -3,10 +3,10 @@
 -include("epm.hrl").
 
 home_dir() ->
-    case init:get_argument(home) of
-		{ok, [[H]]} -> [H];
-		_ -> []
-	end.
+  case init:get_argument(home) of
+    {ok, [[H]]} -> [H];
+    _ -> []
+  end.
 
 set_http_proxy(Host, Port) when Host =:= none orelse Port =:= none ->
   ignored;
@@ -36,7 +36,7 @@ request_as_str(Url, Host) ->
   end.
 
 http_request(Url, Host) ->
-    http_request(Url, Host, []).
+  http_request(Url, Host, []).
 
 http_request(Url, Host, ClientOpts) ->
   Hdrs = make_headers(Host),
@@ -54,7 +54,7 @@ http_request(Url, Host, ClientOpts) ->
   end.
 
 http_options(ClientOpts) ->
-    proxy_options() ++ ClientOpts.
+  proxy_options() ++ ClientOpts.
 
 proxy_options() ->
   case epm_cfg:get(proxy_host) of
@@ -94,10 +94,8 @@ eval(Str) ->
     {ok, Tokens, _} ->
       case erl_parse:parse_exprs(Tokens) of
         {ok, Forms} ->
-          case erl_eval:exprs(Forms, []) of
-            {value, Terms, _} -> Terms;
-            _ -> error
-          end;
+          {value, Terms, _} = erl_eval:exprs(Forms, []),
+          Terms;
         _ -> error
       end;
     _ -> error
@@ -185,8 +183,8 @@ print_cmd_output(Format, Args, true) ->
 	Output = re:replace(Output0, "\~", "", [global, {return, list}]),
 	io:format(string:substr(Output, 1, length(Output)-4), []).
 
-set_cwd_build_home(GlobalConfig) ->
-	set_cwd(proplists:get_value(build_dir, GlobalConfig, ".")).
+set_cwd_build_home(_State=#epm_state{}) ->
+	set_cwd(epm_cfg:get(build_dir, ".")).
 
 set_cwd(Dir) ->
 	case file:set_cwd(Dir) of

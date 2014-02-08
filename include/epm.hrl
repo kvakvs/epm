@@ -5,7 +5,14 @@
 
 -define(EXIT(Format, Args), exit(lists:flatten(io_lib:format(Format, Args)))).
 
--record(repository, { name
+%% State of the application, contains loaded local index, installed apps and
+%% remote index
+-record(epm_state, { local_available = []
+                   , installed = []
+                   , remote_available = []
+                   }).
+
+-record(epm_repo, { name
                     , owner
                     , description
                     , homepage
@@ -13,12 +20,13 @@
                     , pushed
                     , api_module
                     }).
--record(package, {user
+
+-record(epm_package, {user
                  , name
                  , vsn=undefined
                  , app_vsn
                  , install_dir
                  , deps=[]
                  , args=[]
-                 , repo=#repository{}
+                 , repo=#epm_repo{}
                  }).

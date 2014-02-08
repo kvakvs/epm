@@ -37,7 +37,7 @@ open(Home, EpmHome) ->
             dets:close(?local_index),
 
             [{{User, Name, Vsn}
-             , #package{user = User
+             , #epm_package{user = User
                       , name = Name
                       , vsn = Vsn
                       , install_dir = InstallDir
@@ -60,7 +60,9 @@ open(Home, EpmHome) ->
       ?EXIT("insufficient access to epm index file: ~s", [File]);
     {error, Reason} ->
       ?EXIT("failed to open epm index file (~s): ~p", [File, Reason])
-  end.
+  end,
+  State = #epm_state{},
+  State.
 
 list_local_packages() ->
   dets:match(?local_index, '$1').
@@ -72,5 +74,5 @@ list_local_by(User, ProjectName, Version) ->
 delete_local(Key={_User, _Name, _Vsn}) ->
   dets:delete(?local_index, Key).
 
-insert_local(Key={_User, _Name, _Vsn}, Package=#package{}) ->
+insert_local(Key={_User, _Name, _Vsn}, Package=#epm_package{}) ->
   dets:insert(?local_index, {Key, Package}).
