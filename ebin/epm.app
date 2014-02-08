@@ -4,10 +4,10 @@
   {modules, [ epm,
               epm_core,
               epm_package,
-              epm_util,
+              epm_util, epm_cache, epm_deps,
               api_behavior,
-              github_api,
-              bitbucket_api,
+              %github_api,
+              %bitbucket_api,
               yaws_html
   ]},
   {registered, []},

@@ -11,7 +11,7 @@ main(Args) ->
   application:set_env(sasl, sasl_error_logger, false),
   lists:map(fun application:start/1, [sasl, crypto, public_key, ssl, ibrowse, epm]),
 
-  case (catch main1(Args)) of
+  case (catch main_internal(Args)) of
     {'EXIT', ErrorMsg} when is_list(ErrorMsg) ->
       io:format("- ~s~n", [ErrorMsg]);
     {'EXIT', Other} ->
@@ -23,7 +23,7 @@ main(Args) ->
   dets:close(epm_index),
 	io:format("~n").
 
-main1(Args) ->
+main_internal(Args) ->
   Home = epm_util:home_dir(),
   EpmHome = epm_util:epm_home_dir(Home),
   epm_util:open_dets_table(Home, EpmHome),

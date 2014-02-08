@@ -1,1 +1,7 @@
 ebin/*.beam
+deps/*
+deps
+ebin/*
+epm
+*.iml
+.idea
