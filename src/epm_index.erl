@@ -17,48 +17,24 @@
 
 -include("epm.hrl").
 
--define(local_index, epm_index).
+-define(local_index, epm_local_index).
+-define(local_index_file, "epm_local_index").
+
+-define(global_index, epm_index).
+-define(global_index_file, "epm_index").
 
 %%------------------------------------------------------------------------------
 close() ->
-  dets:close(?local_index).
+  dets:close(?local_index),
+  dets:close(?global_index).
 
-open(Home, EpmHome) ->
-  File = filename:join([EpmHome, ?epm_index_filename]),
+open(_Home, EpmHome) ->
+  LocalIndexFile = ?local_index_file,
+  open_dets_file(LocalIndexFile, ?local_index),
 
-  %% TODO: delete this later
-  Insert =
-    case filelib:is_regular(filename:join([Home, ?epm_index_filename])) of
-      true ->
-        DetsPath = filename:join([Home, ?epm_index_filename]),
-        case dets:open_file(?local_index, [{type, set}, {file, DetsPath}]) of
-          {ok, _} ->
-            Rows = dets:match(?local_index, '$1'),
-            dets:close(?local_index),
+  IndexFile = filename:join([EpmHome, ?global_index_file]),
+  open_dets_file(IndexFile , ?global_index),
 
-            [{{User, Name, Vsn}
-             , #pkg{ id = #pkgid{author=User, pkg_name=Name, vsn=Vsn}
-                   , install_dir = InstallDir
-                   , deps = Deps
-                   %, repo = github_api:info(User, Name)
-                   }}
-              || [{{User, Name, Vsn}, InstallDir, Deps}] <- Rows];
-          _ -> []
-        end;
-      false -> []
-    end,
-
-  case dets:open_file(?local_index, [{type, set}, {file, File}]) of
-    {ok, _} ->
-      %% TODO: delete this later
-      [dets:insert(?local_index, I) || I <- Insert],
-      file:delete(filename:join([Home, ?epm_index_filename])),
-      ok;
-    {error, {file_error, _, eacces}} ->
-      ?EXIT("insufficient access to epm index file: ~s", [File]);
-    {error, Reason} ->
-      ?EXIT("failed to open epm index file (~s): ~p", [File, Reason])
-  end,
   State = #epm_state{},
   State.
 
@@ -74,3 +50,13 @@ delete_local(Key={_User, _Name, _Vsn}) ->
 
 insert_local(Key={_User, _Name, _Vsn}, Package=#pkg{}) ->
   dets:insert(?local_index, {Key, Package}).
+
+%% @private
+open_dets_file(File, Table) ->
+  case dets:open_file(Table, [{type, set}, {file, File}]) of
+    {ok, _} -> ok;
+    {error, {file_error, _, eacces}} ->
+      ?EXIT("insufficient access to epm index file: ~s", [File]);
+    {error, Reason} ->
+      ?EXIT("failed to open epm index file (~s): ~p", [File, Reason])
+  end.

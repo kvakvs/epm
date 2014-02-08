@@ -17,7 +17,7 @@
 package_dependencies(Packages) ->
   _RepoPlugins = epm_cfg:get(repo_plugins, ?DEFAULT_API_MODULES),
   G = digraph:new(),
-  UpdatedPackages = [],
+  UpdatedPackages = dict:new(),
 %%   UpdatedPackages = package_dependencies_internal(
 %%                               Packages, RepoPlugins, G, undefined, dict:new()),
   Deps = digraph_utils:topsort(G),

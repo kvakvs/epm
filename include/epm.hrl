@@ -1,13 +1,13 @@
 -define(epm_version, "1.0.0-dev").
 -define(epm_year, 2014).
 -define(DEFAULT_API_MODULES, [github_api]).
--define(epm_index_filename, "epm_index").
 
 -define(any_author, any_author).
 -define(any_vsn, any_vsn).
+-define(any_platform, any_platform).
 
 -define(EXIT(Format, Args), exit(lists:flatten(io_lib:format(Format, Args)))).
--type platform() :: x86 | x64.
+-type platform() :: x86 | x64 | ?any_platform.
 -type erlangvsn() :: binary().
 
 -record(repoid, { name :: string()
@@ -15,11 +15,11 @@
 -type repoid() :: #repoid{}.
 
 %% Unified global identifier for package
--record(pkgid, { author :: string()
+-record(pkgid, { author=?any_author :: string() | ?any_author
               , pkg_name :: string()
-              , platform :: platform()
-              , vsn :: string()
-              , erlang_vsn :: erlangvsn()
+              , platform=?any_platform :: platform()
+              , vsn=?any_vsn :: string() | ?any_vsn
+              , erlang_vsn=?any_vsn :: erlangvsn() | ?any_vsn
               }).
 -type pkgid() :: #pkgid{}.
 

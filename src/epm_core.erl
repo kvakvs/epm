@@ -88,15 +88,15 @@ execute(State=#epm_state{}, ["info" | Args]) ->
       io:format("INSTALLED~n"),
       io:format("===============================~n"),
 
-      lists:foldl(
-        fun(Package, Count) ->
-          case Count of
-            0 -> ok;
-            _ -> io:format("~n")
+      F = fun(Package=#pkg{}, Count) ->
+            case Count of
+              0 -> ok;
+              _ -> io:format("~n")
+            end,
+            epm_ops:print_installed_package_info(Package),
+            Count + 1
           end,
-          epm_ops:print_installed_package_info(Package),
-          Count + 1
-        end, 0, lists:reverse(Installed))
+      lists:foldl(F, 0, lists:reverse(Installed))
   end,
 
   case NotInstalled of
@@ -227,11 +227,11 @@ collect_args_internal(Target, [Arg | Rest], Packages, Flags) ->
                           , Flags);
     {Type, Tag, 0} ->   %% tag with no trailing value
       case Type of
-        project ->
-          [#pkg{args = Args} = Package|OtherPackages] = Packages,
-          collect_args_internal(Target, Rest
-                        , [Package#pkg{args = Args ++ [Tag]}|OtherPackages]
-                        , Flags);
+%%         project ->
+%%           [#pkg{args = Args} = Package|OtherPackages] = Packages,
+%%           collect_args_internal(Target, Rest
+%%                         , [Package#pkg{args = Args ++ [Tag]}|OtherPackages]
+%%                         , Flags);
         global ->
           collect_args_internal(Target, Rest, Packages, [Tag|Flags])
       end;

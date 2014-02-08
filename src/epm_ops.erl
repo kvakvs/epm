@@ -208,11 +208,8 @@ print_installed_package_info(Package) ->
   case Package#pkg.deps of
     [] -> ok;
     Deps ->
-      io:format("  dependencies: ~n    ~s~n", [string:join([
-        case U of
-          none -> lists:flatten(io_lib:format("~s/~s", [N,V]));
-          _ -> lists:flatten(io_lib:format("~s/~s/~s", [U,N,V]))
-        end || {U,N,V} <- Deps], "\n    ")])
+      io:format("  dependencies: ~n  ~s~n",
+        [string:join(lists:map(fun epm:as_string/1, Deps), "\n  ")])
   end.
 
 print_not_installed_package_info(State=#epm_state{}, Packages) ->
