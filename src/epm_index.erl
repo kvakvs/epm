@@ -37,13 +37,11 @@ open(Home, EpmHome) ->
             dets:close(?local_index),
 
             [{{User, Name, Vsn}
-             , #epm_package{user = User
-                      , name = Name
-                      , vsn = Vsn
-                      , install_dir = InstallDir
-                      , deps = Deps
-                      %, repo = github_api:info(User, Name)
-                      }}
+             , #pkg{ id = #pkgid{author=User, pkg_name=Name, vsn=Vsn}
+                   , install_dir = InstallDir
+                   , deps = Deps
+                   %, repo = github_api:info(User, Name)
+                   }}
               || [{{User, Name, Vsn}, InstallDir, Deps}] <- Rows];
           _ -> []
         end;
@@ -74,5 +72,5 @@ list_local_by(User, ProjectName, Version) ->
 delete_local(Key={_User, _Name, _Vsn}) ->
   dets:delete(?local_index, Key).
 
-insert_local(Key={_User, _Name, _Vsn}, Package=#epm_package{}) ->
+insert_local(Key={_User, _Name, _Vsn}, Package=#pkg{}) ->
   dets:insert(?local_index, {Key, Package}).

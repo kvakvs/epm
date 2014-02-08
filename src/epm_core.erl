@@ -18,14 +18,12 @@ execute(State=#epm_state{}, ["install" | Args]) ->
           io:format("===============================~n"),
           io:format("Packages already installed:~n"),
           io:format("===============================~n"),
-          [io:format("    + ~s-~s-~s (~s)~n", [U, N, V, AppVsn])
-           || #epm_package{user = U, name = N, vsn = V, app_vsn = AppVsn} <- Installed]
+          [io:format("    + ~s~n", [epm:as_string(P)]) || P <- Installed]
       end,
       io:format("===============================~n"),
       io:format("Install the following packages?~n"),
       io:format("===============================~n"),
-      [io:format("    + ~s-~s-~s~n", [U, N, V])
-        || #epm_package{user = U, name = N, vsn = V} <- NotInstalled],
+      [io:format("    + ~s~n", [epm:as_string(P)]) || P <- NotInstalled],
       io:format("~n([y]/n) "),
       case io:get_chars("", 1) of
         C when C == "y"; C == "\n" ->
@@ -47,8 +45,7 @@ execute(State=#epm_state{}, ["remove" | Args]) ->
       io:format("===============================~n"),
       io:format("Remove the following packages?~n"),
       io:format("===============================~n"),
-      [io:format("    + ~s-~s-~s~n", [U, N, V])
-        || #epm_package{user = U, name = N, vsn = V} <- Installed],
+      [io:format("    + ~s~n", [epm:as_string(P)]) || P <- Installed],
       io:format("~n([y]/n) "),
       case io:get_chars("", 1) of
         C when C == "y"; C == "\n" ->
@@ -70,8 +67,7 @@ execute(State=#epm_state{}, ["update" | Args]) ->
       io:format("===============================~n"),
       io:format("Update the following packages?~n"),
       io:format("===============================~n"),
-      [io:format("    + ~s-~s-~s~n", [U, N, V])
-        || #epm_package{user = U, name = N, vsn = V} <- Installed],
+      [io:format("    + ~s~n", [epm:as_string(P)]) || P <- Installed],
       io:format("~n([y]/n) "),
       case io:get_chars("", 1) of
         C when C == "y"; C == "\n" ->
@@ -209,15 +205,16 @@ execute(_State=#epm_state{}, _) ->
 %% parse input args
 %% -----------------------------------------------------------------------------
 
-%% collect_args(Target, Args, GlobalConfig) -> Results
-%%   Target = atom()
-%%	 Args = [string()]
-%%`  GlobalConfig = list()
-%%   Results = {[package(), Flags]}
-%%	 Flags = [atom()]
+-spec collect_args(Target :: atom(), Args :: [string()])
+      -> {[#pkgid{}], [atom()]}.
 collect_args(Target, Args) ->
   collect_args_internal(Target, Args, [], []).
 
+-spec collect_args_internal(Target :: atom()
+                           , Args :: [string()]
+                           , Packages :: [#pkgid{}]
+                           , Flags :: [atom()])
+      -> {[#pkgid{}], [atom()]}.
 collect_args_internal(_, [], Packages, Flags) ->
   {lists:reverse(Packages), lists:reverse(Flags)};
 collect_args_internal(Target, [Arg | Rest], Packages, Flags) ->
@@ -226,43 +223,40 @@ collect_args_internal(Target, [Arg | Rest], Packages, Flags) ->
       %% split into user and project
       {ProjectName, User} = epm_ops:split_package(Arg),
       collect_args_internal(Target, Rest
-                          , [#epm_package{user = User, name = ProjectName}|Packages]
+                          , [#pkgid{author=User, pkg_name=ProjectName}|Packages]
                           , Flags);
     {Type, Tag, 0} ->   %% tag with no trailing value
       case Type of
         project ->
-          [#epm_package{args = Args} = Package|OtherPackages] = Packages,
+          [#pkg{args = Args} = Package|OtherPackages] = Packages,
           collect_args_internal(Target, Rest
-                        , [Package#epm_package{args = Args ++ [Tag]}|OtherPackages]
+                        , [Package#pkg{args = Args ++ [Tag]}|OtherPackages]
                         , Flags);
         global ->
           collect_args_internal(Target, Rest, Packages, [Tag|Flags])
       end;
     {Type, Tag, NumVals} when is_integer(NumVals) -> % tag with trailing value(s)
-      if
-        length(Rest) < NumVals ->
+      if length(Rest) < NumVals ->
           exit("poorly formatted command");
         true -> ok
       end,
       {Vals, Rest1} = lists:split(NumVals, Rest),
-      Vals1 =
-        case Vals of
-          [V] -> V;
-          _ -> Vals
-        end,
+      Vals1 = case Vals of
+                [V] -> V;
+                _ -> Vals
+              end,
       case Type of
-        project ->
-          %% this tag applies to the last project on the stack
-          [#epm_package{args = Args} = Package|OtherPackages] = Packages,
-          Vsn = if
-                  Tag == tag; Tag == branch; Tag == sha -> Vals1;
-                  true -> Package#epm_package.vsn
-                end,
-          collect_args_internal( Target, Rest1
-                      , [Package#epm_package{ vsn = Vsn
-                                        , args = Args ++ [{Tag, Vals1}]
-                                        } | OtherPackages]
-                      , Flags);
+%%         project ->
+%%           %% this tag applies to the last project on the stack
+%%           [#pkg{args=Args}=Package | OtherPackages] = Packages,
+%%           Vsn = if Tag == tag; Tag == branch; Tag == sha -> Vals1;
+%%                   true -> Package#pkg.vsn
+%%                 end,
+%%           collect_args_internal( Target, Rest1
+%%                       , [Package#pkg{ vsn = Vsn
+%%                                         , args = Args ++ [{Tag, Vals1}]
+%%                                         } | OtherPackages]
+%%                       , Flags);
         global ->
           if Tag == config_set ->
               [K, V1] = Vals1,

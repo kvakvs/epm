@@ -6,3 +6,4 @@ epm
 *.iml
 .idea
 *.plt
+*.log

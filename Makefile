@@ -9,7 +9,7 @@ PLT_LIBS0 = ebin $(wildcard deps/*/ebin)
 PLT_LIBS  = $(subst deps/riak_pb/ebin,,$(PLT_LIBS0))
 
 DIALYZER_APPS = epm
-DIALYZER_APPS_PATHS = ebin
+DIALYZER_APPS_PATHS = $(wildcard ebin/*.beam)
 #$(addsuffix /ebin, $(addprefix apps/, $(DIALYZER_APPS)))
 
 .PHONY: check_plt
