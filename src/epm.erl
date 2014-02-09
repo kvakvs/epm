@@ -126,4 +126,9 @@ ansi_color(blue) -> [27 | "[1;34m"];
 ansi_color(magenta) -> [27 | "[1;35m"];
 ansi_color(cyan) -> [27 | "[1;36m"];
 ansi_color(white) -> [27 | "[1;37m"];
+
+ansi_color(dark_blue) -> [27 | "[2;34m"];
+ansi_color(dark_red) -> [27 | "[2;31m"];
+ansi_color(dark_white) -> [27 | "[2;37m"];
+ansi_color(dark_green) -> [27 | "[2;32m"];
 ansi_color(dark_cyan) -> [27 | "[2;36m"].

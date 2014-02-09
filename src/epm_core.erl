@@ -18,8 +18,8 @@ execute(State=#epm_state{}, ["install" | Args]) ->
       case Installed of
         [] -> ok;
         _ ->
-          epm:p(white, "Packages already installed:~n"),
-          [epm:p("    + ~s~n", [epm:as_string(P)]) || P <- Installed]
+          epm:p(green, "Packages already installed:~n"),
+          [epm:p(dark_green, "    + ~s~n", [epm:as_string(P)]) || P <- Installed]
       end,
       epm:p(white, "Install the following packages? ([y]/n)~n"),
       [epm:p("    + ~s~n", [epm:as_string(P)]) || P <- NotInstalled],
