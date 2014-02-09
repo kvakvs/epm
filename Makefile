@@ -2,6 +2,10 @@
 compile:
 	rebar get-deps compile escriptize
 
+.PHONY: clean
+clean:
+	rm ebin/* *.log
+
 #-------------------------------------------------------------------------------
 OTP_PLT   = .epm_otp.plt
 COMBO_PLT = .epm_combo.plt

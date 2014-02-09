@@ -1,15 +1,19 @@
--module(api_behavior).
--export([behaviour_info/1]).
+-module(gen_epm_api).
+%-export([behaviour_info/1]).
 
-behaviour_info(callbacks) -> [
-	{package_deps, 3}, 
-	{search, 1}, 
-	{info, 2}, 
-	{tags, 2}, 
-	{branches, 2},
-	{download_package, 2},
-	{default_vsn, 0} ];
-behaviour_info(_) -> undefined.
+-include("epm.hrl").
+
+-callback get_source(Pkg :: pkg(), DestDir :: string()) -> ok | {error, any()}.
+
+%behaviour_info(callbacks) -> [ {get_source, 2} ];
+%behaviour_info(_) -> undefined.
+%% 	{package_deps, 3},
+%% 	{search, 1},
+%% 	{info, 2},
+%% 	{tags, 2},
+%% 	{branches, 2},
+%% 	{download_package, 2},
+%% 	{default_vsn, 0} ];
 
 %% package_deps(User, ProjectName, Vsn) -> Deps
 %%  User = string()

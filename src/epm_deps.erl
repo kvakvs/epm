@@ -25,9 +25,16 @@ resolve_dependencies(Pkgids) ->
 resolve_dependencies_internal(Pkgids, Pkgids) -> Pkgids;
 resolve_dependencies_internal(Pkgids, _Previous) ->
   F = fun(Pkgid=#pkgid{}, A) ->
+      SourceFlag = epm:arg_bool(source, Pkgid),
       PkgList = epm_index:list_global_matching(Pkgid),
-      lists:foldl(fun(Dep, A1) -> ordsets:add_element(Dep, A1) end
-                 , A, lists:flatten([Pkg#pkg.deps || Pkg <- PkgList]))
+      lists:foldl(fun(Dep, A1) ->
+                    % source flag spreads over all deps
+                    Dep1 = epm:set_arg_bool(source, SourceFlag, Dep),
+                    ordsets:add_element(Dep1, A1)
+                  end, A, lists:flatten([Pkg#pkg.deps || Pkg <- PkgList]))
     end,
+  %% For all the package ids get matching packages (TODO: Get 1 best candidate)
+  %% and merge it with all the dependency ids
+
   PkgidsPlusDeps = lists:foldl(F, ordsets:from_list(Pkgids), Pkgids),
   resolve_dependencies_internal(PkgidsPlusDeps, Pkgids).

@@ -151,51 +151,50 @@ execute(_State=#epm_state{}, ["config" | Args]) ->
   end;
 
 execute(_State=#epm_state{}, _) ->
-  io:format("Usage: epm commands~n~n"),
-  io:format("    install [<user>/]<project> {project options}, ... {global options}~n"),
-  io:format("        project options:~n"),
-  io:format("             --tag <tag>~n"),
-  io:format("             --branch <branch>~n"),
-  io:format("             --sha <sha>~n"),
-  io:format("             --with-deps (default)~n"),
-  io:format("             --without-deps~n"),
-  io:format("             --prebuild-command <cmd>~n"),
-  io:format("             --build-command <cmd>~n"),
-  io:format("             --test-command <cmd>~n"),
-  io:format("        global options:~n"),
-  io:format("             --verbose~n"),
-  io:format("             --config-set <key> <value>~n~n"),
-  io:format("    remove [<user>/]<project> {project options}, ... {global options}~n"),
-  io:format("        project options:~n"),
-  io:format("             --tag <tag>~n"),
-  io:format("             --branch <branch>~n"),
-  io:format("             --sha <sha>~n"),
-  io:format("        global options:~n"),
-  io:format("             --verbose~n~n"),
-  io:format("             --config-set <key> <value>~n~n"),
-  io:format("    update [<user>/]<project> {project options}, ... {global options}~n"),
-  io:format("        project options:~n"),
-  io:format("             --tag <tag>~n"),
-  io:format("             --branch <branch>~n"),
-  io:format("             --sha <sha>~n"),
-  io:format("             --with-deps~n"),
-  io:format("             --without-deps (default)~n"),
-  io:format("        global options:~n"),
-  io:format("             --verbose~n~n"),
-  io:format("             --config-set <key> <value>~n~n"),
-  io:format("    info [<user>/]<project>, ... {global options}~n"),
-  io:format("        global options:~n"),
-  io:format("             --config-set <key> <value>~n~n"),
-  io:format("    search <project>, ... {global options}~n"),
-  io:format("        global options:~n"),
-  io:format("             --config-set <key> <value>~n~n"),
-  io:format("    list~n~n"),
-  io:format("    latest~n~n"),
-  io:format("    config {options}~n"),
-  io:format("        options:~n"),
-  io:format("             --get (default)~n"),
-  io:format("             --set <key> <value>~n"),
-  io:format("             --remove <key>~n"),
+  epm:p("Usage: epm commands~n~n"
+        "    install [<author>/]<project> {project options}, ... {global options}~n"
+        "        project options:~n"
+        "             --source :: requests source install (does not build)~n"
+        "             --platform x86|x64, --vsn <v>, --tag <t>, --branch <b>, --hash <h>~n"
+%%         "             --with-deps (default)~n"
+%%         "             --without-deps~n"
+%%         "             --prebuild-command <cmd>~n"
+%%         "             --build-command <cmd>~n"
+%%         "             --test-command <cmd>~n"
+        "        global options:~n"
+%%         "             --verbose~n"
+        "             --config-set <key> <value>~n~n"
+%%         "    remove [<user>/]<project> {project options}, ... {global options}~n"
+%%         "        project options:~n"
+%%         "             --tag <tag>~n"
+%%         "             --branch <branch>~n"
+%%         "             --sha <sha>~n"
+%%         "        global options:~n"
+%%         "             --verbose~n~n"
+%%         "             --config-set <key> <value>~n~n"
+%%         "    update [<user>/]<project> {project options}, ... {global options}~n"
+%%         "        project options:~n"
+%%         "             --tag <tag>~n"
+%%         "             --branch <branch>~n"
+%%         "             --sha <sha>~n"
+%%         "             --with-deps~n"
+%%         "             --without-deps (default)~n"
+%%         "        global options:~n"
+%%         "             --verbose~n~n"
+%%         "             --config-set <key> <value>~n~n"
+%%         "    info [<user>/]<project>, ... {global options}~n"
+%%         "        global options:~n"
+%%         "             --config-set <key> <value>~n~n"
+%%         "    search <project>, ... {global options}~n"
+%%         "        global options:~n"
+%%         "             --config-set <key> <value>~n~n"
+%%         "    list~n~n"
+%%         "    latest~n~n"
+        "    config {options}~n"
+        "        options:~n"
+        "             --get (default)~n"
+        "             --set <key> <value>~n"
+        "             --remove <key>~n"),
   ok.
 
 %% -----------------------------------------------------------------------------
@@ -209,32 +208,32 @@ collect_args(Target, Args) ->
 
 -spec collect_args_internal(Target :: atom()
                            , Args :: [string()]
-                           , Packages :: [#pkgid{}]
+                           , Pkgids :: [#pkgid{}]
                            , Flags :: [atom()])
       -> {[#pkgid{}], [atom()]}.
 collect_args_internal(_, [], Packages, Flags) ->
   {lists:reverse(Packages), lists:reverse(Flags)};
-collect_args_internal(Target, [Arg | Rest], Packages, Flags) ->
+collect_args_internal(Target, [Arg | Rest], Pkgids, Flags) ->
   case parse_tag(Target, Arg) of
     undefined -> %% if not a tag then must be a project name
       %% split into user and project
       {ProjectName, User} = epm_ops:split_package(Arg),
       collect_args_internal(Target, Rest
-                          , [#pkgid{author=User, pkg_name=ProjectName}|Packages]
+                          , [#pkgid{author=User, pkg_name=ProjectName}|Pkgids]
                           , Flags);
     {Type, Tag, 0} ->   %% tag with no trailing value
       case Type of
-%%         project ->
-%%           [#pkg{args = Args} = Package|OtherPackages] = Packages,
-%%           collect_args_internal(Target, Rest
-%%                         , [Package#pkg{args = Args ++ [Tag]}|OtherPackages]
-%%                         , Flags);
+        project ->
+          %% Update head of Pkgids with additional arg
+          [#pkgid{args=Args} = Pkgid|Tail] = Pkgids,
+          Pkgid1 = Pkgid#pkgid{ args = Args ++ [Tag] },
+          collect_args_internal(Target, Rest, [Pkgid1 | Tail], Flags);
         global ->
-          collect_args_internal(Target, Rest, Packages, [Tag|Flags])
+          collect_args_internal(Target, Rest, Pkgids, [Tag|Flags])
       end;
     {Type, Tag, NumVals} when is_integer(NumVals) -> % tag with trailing value(s)
       if length(Rest) < NumVals ->
-          exit("poorly formatted command");
+          ?EPM_FAIL("poorly formatted command", []);
         true -> ok
       end,
       {Vals, Rest1} = lists:split(NumVals, Rest),
@@ -243,17 +242,15 @@ collect_args_internal(Target, [Arg | Rest], Packages, Flags) ->
                 _ -> Vals
               end,
       case Type of
-%%         project ->
-%%           %% this tag applies to the last project on the stack
-%%           [#pkg{args=Args}=Package | OtherPackages] = Packages,
-%%           Vsn = if Tag == tag; Tag == branch; Tag == sha -> Vals1;
-%%                   true -> Package#pkg.vsn
-%%                 end,
-%%           collect_args_internal( Target, Rest1
-%%                       , [Package#pkg{ vsn = Vsn
-%%                                         , args = Args ++ [{Tag, Vals1}]
-%%                                         } | OtherPackages]
-%%                       , Flags);
+        project ->
+          %% Update head of Pkgids with additional arg
+          %% this tag applies to the last project on the stack
+          [#pkgid{args=Args}=Pkgid | Tail] = Pkgids,
+          Vsn = if Tag == tag; Tag == branch; Tag == hash -> Vals1;
+                  true -> Pkgid#pkgid.vsn
+                end,
+          Pkgid2 = Pkgid#pkgid{ vsn = Vsn, args = Args ++ [{Tag, Vals1}] },
+          collect_args_internal( Target, Rest1, [Pkgid2 | Tail], Flags);
         global ->
           if Tag == config_set ->
               [K, V1] = Vals1,
@@ -264,7 +261,7 @@ collect_args_internal(Target, [Arg | Rest], Packages, Flags) ->
               end;
             true -> ok
           end,
-          collect_args_internal(Target, Rest1, Packages, [{Tag, Vals1}|Flags])
+          collect_args_internal(Target, Rest1, Pkgids, [{Tag, Vals1}|Flags])
       end
   end.
 
@@ -273,19 +270,20 @@ collect_args_internal(Target, [Arg | Rest], Packages, Flags) ->
 %%		 Arg = string()
 %%		 Tag = atom()
 %%		 HasValue = bool()
+parse_tag(install, "--source") -> {project, source, 0};
 parse_tag(install, "--tag") -> {project, tag, 1};
 parse_tag(install, "--branch") -> {project, branch, 1};
-parse_tag(install, "--sha") -> {project, sha, 1};
-parse_tag(install, "--prebuild-command") -> {project, prebuild_command, 1};
-parse_tag(install, "--build-command") -> {project, build_command, 1};
-parse_tag(install, "--test-command") -> {project, test_command, 1};
+parse_tag(install, "--hash") -> {project, hash, 1};
+%% parse_tag(install, "--prebuild-command") -> {project, prebuild_command, 1};
+%% parse_tag(install, "--build-command") -> {project, build_command, 1};
+%% parse_tag(install, "--test-command") -> {project, test_command, 1};
 
-parse_tag(info, "--tag") -> {project, tag, 1};
-parse_tag(info, "--branch") -> {project, branch, 1};
-parse_tag(info, "--sha") -> {project, sha, 1};
+%% parse_tag(info, "--tag") -> {project, tag, 1};
+%% parse_tag(info, "--branch") -> {project, branch, 1};
+%% parse_tag(info, "--sha") -> {project, sha, 1};
 
-parse_tag(_, "--with-deps") -> {project, with_deps, 0};
-parse_tag(_, "--without-deps") -> {project, without_deps, 0};
+%% parse_tag(_, "--with-deps") -> {project, with_deps, 0};
+%% parse_tag(_, "--without-deps") -> {project, without_deps, 0};
 
 parse_tag(config, "--get") -> {global, get, 0};
 parse_tag(config, "--set") -> {global, set, 2};
@@ -314,7 +312,7 @@ update_epm(_State) ->
     {ok, {{_, 200, _}, _, Body}} ->
       case file:write_file(File, Body) of
         ok ->
-          io:format("+ updated epm (~s) to latest version~n", [File]);
+          epm:p("+ updated epm (~s) to latest version~n", [File]);
         {error, Reason} ->
           exit(lists:flatten(io_lib:format("failed to overwrite epm executable ~s: ~p~n", [File, Reason])))
       end;

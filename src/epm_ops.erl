@@ -20,7 +20,7 @@
         , update_package/2
         , remove_package/2
         , install_package/2
-        , install/3
+        %, install/3
         ]).
 
 -include("epm.hrl").
@@ -30,7 +30,12 @@
 -spec filter_installed_packages([#pkg{}]) ->
   {[#pkg{}], [#pkg{}]}.
 filter_installed_packages(Pkgids) ->
-  lists:partition(fun(Id=#pkgid{}) -> epm_index:is_installed(Id) end, Pkgids).
+  {Installed, Not} = lists:partition(
+                            fun(Id=#pkgid{}) -> epm_index:is_installed(Id) end
+                            , Pkgids),
+  Installed1 = lists:map(fun(X) -> epm:set_arg_bool(source, false, X) end
+                        , Installed),
+  {Installed1, Not}.
 %% filter_installed_packages(Packages) ->
 %%   filter_installed_packages(Packages, [], []).
 %%
@@ -339,32 +344,33 @@ install_package(State=#epm_state{}, #pkgid{}=Pkgid) ->
   %epm_index:insert_local({User, Name, Vsn}, Package1),
   State.
 
-install(ProjectName, Config, undefined) ->
-  install(ProjectName, Config, code:lib_dir());
-
-install(ProjectName, _Config, LibDir) ->
-  Vsn =
-    case file:consult("ebin/" ++ ProjectName ++ ".app") of
-      {ok, [{application, _, Props}]} ->
-        proplists:get_value(vsn, Props);
-      _ ->
-        undefined
-    end,
-  Dir =
-    case Vsn of
-      undefined -> LibDir ++ "/" ++ ProjectName;
-      _ -> LibDir ++ "/" ++ ProjectName ++ "-" ++ Vsn
-    end,
-  InstallCmd = "mkdir -p " ++ Dir ++ "; cp -R ./* " ++ Dir,
-  io:format("+ running ~s install command~n", [ProjectName]),
-  epm_util:print_cmd_output("~s~n", [InstallCmd]),
-  epm_util:do_cmd(InstallCmd, fail),
-  Ebin = Dir ++ "/ebin",
-  case code:add_pathz(Ebin) of
-    true -> ok;
-    Err  ->
-      M = io_lib:format("failed to add path for ~s (~s): ~p"
-                       , [ProjectName, Ebin, Err]),
-      exit(lists:flatten(M))
-  end,
-  Dir.
+%%---------------------------------------------------------------------------
+%% install(ProjectName, Config, undefined) ->
+%%   install(ProjectName, Config, code:lib_dir());
+%%
+%% install(ProjectName, _Config, LibDir) ->
+%%   Vsn =
+%%     case file:consult("ebin/" ++ ProjectName ++ ".app") of
+%%       {ok, [{application, _, Props}]} ->
+%%         proplists:get_value(vsn, Props);
+%%       _ ->
+%%         undefined
+%%     end,
+%%   Dir =
+%%     case Vsn of
+%%       undefined -> LibDir ++ "/" ++ ProjectName;
+%%       _ -> LibDir ++ "/" ++ ProjectName ++ "-" ++ Vsn
+%%     end,
+%%   InstallCmd = "mkdir -p " ++ Dir ++ "; cp -R ./* " ++ Dir,
+%%   io:format("+ running ~s install command~n", [ProjectName]),
+%%   epm_util:print_cmd_output("~s~n", [InstallCmd]),
+%%   epm_util:do_cmd(InstallCmd, fail),
+%%   Ebin = Dir ++ "/ebin",
+%%   case code:add_pathz(Ebin) of
+%%     true -> ok;
+%%     Err  ->
+%%       M = io_lib:format("failed to add path for ~s (~s): ~p"
+%%                        , [ProjectName, Ebin, Err]),
+%%       exit(lists:flatten(M))
+%%   end,
+%%   Dir.

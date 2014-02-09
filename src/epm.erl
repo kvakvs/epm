@@ -8,7 +8,7 @@
         , matches/2
         , platform/1
         , p/3, p/2, p/1
-        , s/2, pkgid_match_spec/1]).
+        , s/2, pkgid_match_spec/1, args/1, arg_bool/2, arg/2, set_arg_bool/3]).
 
 -include("epm.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
@@ -58,15 +58,28 @@ platform(#pkgid{platform=X}) -> X.
 erlang_vsn(#pkg{id=#pkgid{erlang_vsn=X}}) -> X;
 erlang_vsn(#pkgid{erlang_vsn=X}) -> X.
 
+args(#pkgid{args=X}) -> X.
+
+arg_bool(Arg, #pkgid{args=X}) -> lists:member(Arg, X).
+
+arg(Arg, #pkgid{args=X}) -> proplists:get_value(Arg, X).
+
+set_arg_bool(Arg, false, #pkgid{args=Args}=Pkgid) ->
+  Pkgid#pkgid{args = lists:delete(Arg, Args)};
+set_arg_bool(Arg, true, #pkgid{args=Args}=Pkgid) ->
+  Pkgid#pkgid{args = [Arg | lists:delete(Arg, Args)]}.
+
 %%------------------------------------------------------------------------------
 as_string(#pkg{id=Id}) -> as_string(Id);
-as_string(#pkgid{author=A, pkg_name=N, vsn=V, platform=P, erlang_vsn=E}) ->
+as_string(#pkgid{ author=A, pkg_name=N, vsn=V, platform=P, erlang_vsn=E
+                , args=Args}) ->
   "["
     ++ case A of ?any_author -> ""; _ -> s("~s/", [A]) end
     ++ N
     ++ case V of ?any_vsn -> ""; _ -> s(", ~s", [V]) end
     ++ case P of ?any_platform -> ""; _ -> s(", ~s", [P]) end
     ++ case E of ?any_erlang_vsn -> ""; _ -> s(", ~s", [E]) end
+    ++ case Args of [] -> ""; _ -> s(" ~p", [Args]) end
     ++ "]";
 as_string(#repo{id=I, description=_D, url=U}) ->
   s("[Repo ~s url=~s]", [I, U]);
