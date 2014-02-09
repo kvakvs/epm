@@ -7,3 +7,4 @@ epm
 .idea
 *.plt
 *.log
+epm_local_index

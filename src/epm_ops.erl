@@ -12,7 +12,7 @@
 %%         , retrieve_remote_repos/4
         , installed_packages/1
         , get_installed_packages/1
-        , split_package/1
+        , split_package/1 % remove this?
         , read_vsn_from_args/2
         , print_installed_package_info/1
         , print_not_installed_package_info/2
@@ -29,17 +29,19 @@
 %% @doc Returns pair of installed and not installed packages
 -spec filter_installed_packages([#pkg{}]) ->
   {[#pkg{}], [#pkg{}]}.
-filter_installed_packages(Packages) ->
-  filter_installed_packages(Packages, [], []).
-
-%% @private
-filter_installed_packages([], Installed, NotInstalled) ->
-  {lists:reverse(Installed), NotInstalled};
-filter_installed_packages([Package|Tail], Installed, NotInstalled) ->
-  case local_package_info(Package) of
-    [] -> filter_installed_packages(Tail, Installed, [Package|NotInstalled]);
-    [P|_] -> filter_installed_packages(Tail, [P|Installed], NotInstalled)
-  end.
+filter_installed_packages(Pkgids) ->
+  lists:partition(fun(Id=#pkgid{}) -> epm_index:is_installed(Id) end, Pkgids).
+%% filter_installed_packages(Packages) ->
+%%   filter_installed_packages(Packages, [], []).
+%%
+%% %% @private
+%% filter_installed_packages([], Installed, NotInstalled) ->
+%%   {lists:reverse(Installed), NotInstalled};
+%% filter_installed_packages([Package|Tail], Installed, NotInstalled) ->
+%%   case local_package_info(Package) of
+%%     [] -> filter_installed_packages(Tail, Installed, [Package|NotInstalled]);
+%%     [P|_] -> filter_installed_packages(Tail, [P|Installed], NotInstalled)
+%%   end.
 
 
 split_package(Raw) -> split_package(Raw, []).
@@ -162,28 +164,28 @@ dependant_installed_packages(#pkg{}=Package
 local_package_info(#pkg{id=#pkgid{ author = ?any_author
                                  , pkg_name = ProjectName
                                  , vsn = ?any_vsn}}) ->
-  case epm_index:list_local_by('_', ProjectName, '_') of
+  case epm_index:list_local_matching('_', ProjectName, '_') of
     [] -> [];
     List -> [Package || [Package] <- List]
   end;
 local_package_info(#pkg{id=#pkgid{ author = ?any_author
                                  , pkg_name = ProjectName
                                  , vsn = Vsn}}) ->
-  case epm_index:list_local_by('_', ProjectName, Vsn) of
+  case epm_index:list_local_matching('_', ProjectName, Vsn) of
     [] -> [];
     List -> [Package || [Package] <- List]
   end;
 local_package_info(#pkg{id=#pkgid{ author = User
                                  , pkg_name = ProjectName
                                  , vsn = ?any_vsn }}) ->
-  case epm_index:list_local_by(User, ProjectName, '_') of
+  case epm_index:list_local_matching(User, ProjectName, '_') of
     [] -> [];
     List -> [Package || [Package] <- List]
   end;
 local_package_info(#pkg{id=#pkgid{ author = User
                                  , pkg_name = ProjectName
                                  , vsn = Vsn }}) ->
-  case epm_index:list_local_by(User, ProjectName, Vsn) of
+  case epm_index:list_local_matching(User, ProjectName, Vsn) of
     [] -> [];
     List -> [Package || [Package] <- List]
   end.
@@ -308,7 +310,10 @@ update_package(State=#epm_state{}, #pkgid{}=Pkgid) ->
 %% -----------------------------------------------------------------------------
 -spec install_package(#epm_state{}, #pkgid{}) -> #epm_state{}.
 install_package(State=#epm_state{}, #pkgid{}=Pkgid) ->
-  io:format("+ searching to install package ~s~n" , [epm:as_string(Pkgid)]),
+  epm:p("+ searching to install ~s~n" , [epm:as_string(Pkgid)]),
+  PkgList = epm_index:list_global_matching(Pkgid),
+  epm:p("  available: ~s~n",
+    [string:join(lists:map(fun epm:as_string/1, PkgList), "; ")]),
   %Repo = Package#pkg.repo,
   %User = Repo#repo.owner,
   %Name = Repo#repo.name,

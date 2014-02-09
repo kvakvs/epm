@@ -8,9 +8,10 @@
         , matches/2
         , platform/1
         , p/3, p/2, p/1
-        , s/2]).
+        , s/2, pkgid_match_spec/1]).
 
 -include("epm.hrl").
+-include_lib("stdlib/include/ms_transform.hrl").
 
 main(Args) ->
   application:load(sasl),
@@ -59,15 +60,18 @@ erlang_vsn(#pkgid{erlang_vsn=X}) -> X.
 
 %%------------------------------------------------------------------------------
 as_string(#pkg{id=Id}) -> as_string(Id);
-as_string(#pkgid{author=?any_author, pkg_name=N, vsn=V, platform=P, erlang_vsn=E}) ->
-  lists:flatten(io_lib:format("Package ~s/~s ~s/~s", [N,V, P,E]));
 as_string(#pkgid{author=A, pkg_name=N, vsn=V, platform=P, erlang_vsn=E}) ->
-  lists:flatten(io_lib:format("Package by ~s ~s/~s ~s/~s", [A,N,V, P,E]));
+  "["
+    ++ case A of ?any_author -> ""; _ -> s("~s/", [A]) end
+    ++ N
+    ++ case V of ?any_vsn -> ""; _ -> s(", ~s", [V]) end
+    ++ case P of ?any_platform -> ""; _ -> s(", ~s", [P]) end
+    ++ case E of ?any_erlang_vsn -> ""; _ -> s(", ~s", [E]) end
+    ++ "]";
 as_string(#repo{id=I, description=_D, url=U}) ->
-  lists:flatten(io_lib:format("Repo ~s url=~s", [I, U]));
+  s("[Repo ~s url=~s]", [I, U]);
 as_string(#repoid{name=N}) ->
-  lists:flatten(io_lib:format("Repo id ~s", [N]));
-as_string(undefined) -> "undefined".
+  s("[Repo id ~s]", [N]).
 
 %% @doc Checks that P1 with some wildcard fields matches P2
 matches(#pkgid{}=P1, #pkgid{}=P2) ->
@@ -82,17 +86,29 @@ matches(#pkgid{}=P1, #pkgid{}=P2) ->
     andalso (P1Platf =:= platform(P2) orelse P1Platf =:= ?any_platform)
     ).
 
+pkgid_match_spec(#pkgid{ author=A1, pkg_name=N1, platform=P1
+                       , vsn=V1, erlang_vsn=E1}) ->
+  ets:fun2ms(fun(#pkg{id=#pkgid{ author=A2, pkg_name=N2, platform=P2
+                               , vsn=V2, erlang_vsn=E2}}=Pkg)
+      when (N1 =:= N2
+          andalso (A1 =:= A2 orelse A1 =:= ?any_author)
+          andalso (V1 =:= V2 orelse V1 =:= ?any_vsn)
+          andalso (E1 =:= E2 orelse E1 =:= ?any_erlang_vsn)
+          andalso (P1 =:= P2 orelse P1 =:= ?any_platform)
+    ) -> Pkg end).
+
+%%------------------------------------------------------------------------------
 %% @doc Uncolored print
 p(Text) -> io:format(Text).
 
 %% @doc Colored print and formatted uncolored print
 p(Color, Text) when is_atom(Color) ->
-  io:format(ansi_color(Color) ++ Text ++ ansi_endfont());
+  p(ansi_color(Color) ++ Text ++ ansi_endfont());
 p(Text, Args) -> io:format(Text, Args).
 
 %% @doc Formatted colored print
 p(Color, Format, Args) when is_atom(Color) ->
-  io:format(ansi_color(Color) ++ Format ++ ansi_endfont() ++ "~n", Args).
+  p(ansi_color(Color) ++ Format ++ ansi_endfont() ++ "~n", Args).
 
 %% @doc sprintf
 s(Format, Args) ->

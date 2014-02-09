@@ -18,19 +18,13 @@ execute(State=#epm_state{}, ["install" | Args]) ->
       case Installed of
         [] -> ok;
         _ ->
-          epm:p("===============================~n"
-                "Packages already installed:~n"
-                "===============================~n"),
+          epm:p(white, "Packages already installed:~n"),
           [epm:p("    + ~s~n", [epm:as_string(P)]) || P <- Installed]
       end,
-      epm:p("===============================~n"
-            "Install the following packages?~n"
-            "===============================~n"),
+      epm:p(white, "Install the following packages? ([y]/n)~n"),
       [epm:p("    + ~s~n", [epm:as_string(P)]) || P <- NotInstalled],
-      epm:p(yellow, "~n([y]/n) "),
       case io:get_chars("", 1) of
         C when C == "y"; C == "\n" ->
-          epm:p("~n"),
           lists:foldl(fun(X, St) -> epm_ops:install_package(St, X) end
                      , State, NotInstalled);
         _ -> ok
