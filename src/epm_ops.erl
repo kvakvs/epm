@@ -43,9 +43,9 @@ filter_installed_packages([Package|Tail], Installed, NotInstalled) ->
 
 
 split_package(Raw) -> split_package(Raw, []).
-split_package([], Package) -> {Package, none};
-split_package([47 | Package], User) -> {Package, User};
-split_package([A | Tail], User) -> split_package(Tail, User ++ [A]).
+split_package([], Package) -> {Package, ?any_author};
+split_package([47 | Package], Author) -> {Package, Author};
+split_package([A | Tail], Author) -> split_package(Tail, Author ++ [A]).
 
 
 installed_packages(_State=#epm_state{}) ->
@@ -84,7 +84,7 @@ dependant_installed_packages(_Package, Acc, []) -> Acc;
 dependant_installed_packages(#pkg{}=Package
                     , Acc
                     , [[{_, #pkg{deps = Deps} = InstalledPackage}]|Tail]) ->
-  F = fun(#pkgid{}=Pkgid) -> epm:equals(Pkgid, Package#pkg.id) end,
+  F = fun(#pkgid{}=Pkgid) -> epm:matches(Pkgid, Package#pkg.id) end,
   Acc1 = case lists:filter(F, Deps) of
            [] -> Acc;
            [_] -> [InstalledPackage|Acc]

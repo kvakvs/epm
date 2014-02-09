@@ -46,7 +46,7 @@ init() ->
         file:write_file(filename:join([Home, ".epm"]), <<>>),
         [];
       {error, Reason} ->
-        ?EXIT("failed to read epm global config: ~p", [Reason])
+        ?EPM_FAIL("failed to read epm global config: ~p", [Reason])
     end,
   lists:foreach(fun({K, V}) -> set(K, V) end, GlobalConfig).
 
@@ -98,5 +98,5 @@ write_config_file() ->
       io:format(IoDevice, "~n].~n", []),
       io:format("+ updated .epm config~n");
     {error, Reason} ->
-      ?EXIT("failed to update .epm config (~s): ~p", [FileLoc, Reason])
+      ?EPM_FAIL("failed to update .epm config (~s): ~p", [FileLoc, Reason])
   end.

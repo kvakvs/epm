@@ -84,7 +84,7 @@ epm_home_dir(Home) ->
       case file:make_dir(EPM) of
         ok -> EPM;
         {error, Reason} ->
-          ?EXIT("failed to create epm home directory (~s): ~p", [EPM, Reason])
+          ?EPM_FAIL("failed to create epm home directory (~s): ~p", [EPM, Reason])
       end
   end.
 

@@ -5,8 +5,10 @@
         , vsn/1
         , erlang_vsn/1
         , as_string/1
-        , equals/2
-        , platform/1]).
+        , matches/2
+        , platform/1
+        , p/3, p/2, p/1
+        , s/2]).
 
 -include("epm.hrl").
 
@@ -17,8 +19,9 @@ main(Args) ->
            , [sasl, crypto, public_key, ssl, ibrowse, epm]),
 
   case (catch main_internal(Args)) of
-    {'EXIT', Msg} when is_list(Msg) -> io:format("- ~s~n", [Msg]);
-    {'EXIT', Other}                 -> io:format("~p~n", [Other]);
+    {'EXIT', {ok, Msg}} when is_list(Msg)    -> epm:p(red, "- ~s~n", [Msg]);
+    {'EXIT', {error, Msg}} when is_list(Msg) -> epm:p(green, "- ~s~n", [Msg]);
+    {'EXIT', Other}                      -> epm:p(dark_cyan, "~p~n", [Other]);
     _ -> ok
   end,
   epm_index:close(),
@@ -66,9 +69,45 @@ as_string(#repoid{name=N}) ->
   lists:flatten(io_lib:format("Repo id ~s", [N]));
 as_string(undefined) -> "undefined".
 
-equals(#pkgid{}=P1, #pkgid{}=P2) ->
-  (author(P1) =:= author(P2) orelse author(P2) =:= ?any_author)
-    andalso (name(P1) =:= name(P2))
-    andalso (vsn(P1) =:= vsn(P2) orelse vsn(P1) =:= ?any_vsn)
-    andalso (erlang_vsn(P1) =:= erlang_vsn(P2) orelse erlang_vsn(P1) =:= ?any_vsn)
-    andalso (platform(P1) =:= platform(P2)).
+%% @doc Checks that P1 with some wildcard fields matches P2
+matches(#pkgid{}=P1, #pkgid{}=P2) ->
+  P1Author = author(P1),
+  P1V = vsn(P1),
+  P1Erlang = erlang_vsn(P1),
+  P1Platf = platform(P1),
+  ( name(P1) =:= name(P2)
+    andalso (P1Author =:= author(P2) orelse P1Author =:= ?any_author)
+    andalso (P1V =:= vsn(P2) orelse P1V =:= ?any_vsn)
+    andalso (P1Erlang =:= erlang_vsn(P2) orelse P1Erlang =:= ?any_erlang_vsn)
+    andalso (P1Platf =:= platform(P2) orelse P1Platf =:= ?any_platform)
+    ).
+
+%% @doc Uncolored print
+p(Text) -> io:format(Text).
+
+%% @doc Colored print and formatted uncolored print
+p(Color, Text) when is_atom(Color) ->
+  io:format(ansi_color(Color) ++ Text ++ ansi_endfont());
+p(Text, Args) -> io:format(Text, Args).
+
+%% @doc Formatted colored print
+p(Color, Format, Args) when is_atom(Color) ->
+  io:format(ansi_color(Color) ++ Format ++ ansi_endfont() ++ "~n", Args).
+
+%% @doc sprintf
+s(Format, Args) ->
+  lists:flatten(io_lib:format(Format, Args)).
+
+%% @doc ANSI ESCape color codes: reset font color/weight
+ansi_endfont() -> [27 | "[0m"].
+
+%% @doc ANSI ESCape color codes: font color
+ansi_color(black) -> [27 | "[1;30m"];
+ansi_color(red) -> [27 | "[1;31m"];
+ansi_color(green) -> [27 | "[1;32m"];
+ansi_color(yellow) -> [27 | "[1;33m"];
+ansi_color(blue) -> [27 | "[1;34m"];
+ansi_color(magenta) -> [27 | "[1;35m"];
+ansi_color(cyan) -> [27 | "[1;36m"];
+ansi_color(white) -> [27 | "[1;37m"];
+ansi_color(dark_cyan) -> [27 | "[2;36m"].

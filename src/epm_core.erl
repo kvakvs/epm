@@ -4,30 +4,33 @@
 -include("epm.hrl").
 
 execute(State=#epm_state{}, ["install" | Args]) ->
-  {Packages, Flags} = collect_args(install, Args),
+  {Pkgids, Flags} = collect_args(install, Args),
   epm_cfg:set(verbose, lists:member(verbose, Flags)),
-  Deps = epm_deps:package_dependencies(Packages),
+
+  Deps = epm_deps:resolve_dependencies(Pkgids),
+  %Packages = lists:flatten(lists:map(fun epm_index:find_package/1, Pkgids)),
+  epm:p("ids=~p~ndeps=~p~n", [Pkgids, Deps]),
   {Installed, NotInstalled} = epm_ops:filter_installed_packages(Deps),
   case NotInstalled of
     [] ->
-      io:format("+ nothing to do: packages and dependencies already installed~n");
+      epm:p("+ nothing to do: packages and dependencies already installed~n");
     _ ->
       case Installed of
         [] -> ok;
         _ ->
-          io:format("===============================~n"),
-          io:format("Packages already installed:~n"),
-          io:format("===============================~n"),
-          [io:format("    + ~s~n", [epm:as_string(P)]) || P <- Installed]
+          epm:p("===============================~n"
+                "Packages already installed:~n"
+                "===============================~n"),
+          [epm:p("    + ~s~n", [epm:as_string(P)]) || P <- Installed]
       end,
-      io:format("===============================~n"),
-      io:format("Install the following packages?~n"),
-      io:format("===============================~n"),
-      [io:format("    + ~s~n", [epm:as_string(P)]) || P <- NotInstalled],
-      io:format("~n([y]/n) "),
+      epm:p("===============================~n"
+            "Install the following packages?~n"
+            "===============================~n"),
+      [epm:p("    + ~s~n", [epm:as_string(P)]) || P <- NotInstalled],
+      epm:p(yellow, "~n([y]/n) "),
       case io:get_chars("", 1) of
         C when C == "y"; C == "\n" ->
-          io:format("~n"),
+          epm:p("~n"),
           lists:foldl(fun(X, St) -> epm_ops:install_package(St, X) end
                      , State, NotInstalled);
         _ -> ok

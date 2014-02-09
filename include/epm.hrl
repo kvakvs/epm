@@ -3,10 +3,13 @@
 -define(DEFAULT_API_MODULES, [github_api]).
 
 -define(any_author, any_author).
--define(any_vsn, any_vsn).
 -define(any_platform, any_platform).
+-define(any_vsn, any_vsn).
+-define(any_erlang_vsn, any_erlang_vsn).
 
--define(EXIT(Format, Args), exit(lists:flatten(io_lib:format(Format, Args)))).
+-define(EPM_FAIL(Format, Args), begin exit({error, epm:s(Format, Args)}) end).
+-define(EPM_EXIT(Format, Args), begin exit({ok, epm:s(Format, Args)}) end).
+
 -type platform() :: x86 | x64 | ?any_platform.
 -type erlangvsn() :: binary().
 
@@ -19,7 +22,7 @@
               , pkg_name :: string()
               , platform=?any_platform :: platform()
               , vsn=?any_vsn :: string() | ?any_vsn
-              , erlang_vsn=?any_vsn :: erlangvsn() | ?any_vsn
+              , erlang_vsn=?any_erlang_vsn :: erlangvsn() | ?any_erlang_vsn
               }).
 -type pkgid() :: #pkgid{}.
 
@@ -49,8 +52,8 @@
 
 %% State of the application, contains loaded local index, installed apps and
 %% remote index
--record(epm_state, { local_available=[] :: [pkg()]
-                   , installed=[] :: [installed_pkg()]
-                   , remote_available=[] :: [pkg()]
-                   , repositories=[] :: [repo()]
+-record(epm_state, { installed=[] :: [installed_pkg()]
+                   , global_index=[] :: [pkg()]
+                   %, local_index=[] :: [pkg()]
+                   %, repos=[] :: [repo()]
                    }).
