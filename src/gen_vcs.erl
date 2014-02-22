@@ -1,4 +1,4 @@
--module(gen_epm_api).
+-module(gen_vcs).
 %-export([behaviour_info/1]).
 
 -include("epm.hrl").

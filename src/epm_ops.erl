@@ -319,6 +319,11 @@ install_package(State=#epm_state{}, #pkgid{}=Pkgid) ->
   PkgList = epm_index:list_global_matching(Pkgid),
   epm:p("  available: ~s~n",
     [string:join(lists:map(fun epm:as_string/1, PkgList), "; ")]),
+  %% Fetch the package
+  %% TODO: Binary packages
+  Preferred = epm_deps:preferred_package(PkgList, Pkgid),
+  epm_vcs:get_source(Preferred, "deps"),
+
   %Repo = Package#pkg.repo,
   %User = Repo#repo.owner,
   %Name = Repo#repo.name,

@@ -7,7 +7,7 @@
 -module(epm_deps).
 
 %% API
--export([resolve_dependencies/1]).
+-export([resolve_dependencies/1, preferred_package/2]).
 
 -include("epm.hrl").
 
@@ -38,3 +38,12 @@ resolve_dependencies_internal(Pkgids, _Previous) ->
 
   PkgidsPlusDeps = lists:foldl(F, ordsets:from_list(Pkgids), Pkgids),
   resolve_dependencies_internal(PkgidsPlusDeps, Pkgids).
+
+%% @doc Guesses preferred package from list of pkgids, and loads its definition
+-spec preferred_package(PkgList :: [pkg()], Pkgid :: pkgid()) -> pkg().
+preferred_package(PkgList, _Pkgid) ->
+  %% TODO: Much heuristic. Such insight. Very compatible. Wow.
+  hd(PkgList).
+  %Id = hd(PkgList),
+  %[Pkg] = epm_index:get_pkg(Id), % assume 1 result
+  %Pkg.

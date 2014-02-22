@@ -12,7 +12,8 @@
         , delete_local/1
         , insert_local/2
         , close/0
-        , is_installed/1]).
+        , is_installed/1
+        , get_repo/1, get_pkg/1]).
 -export([list_local_packages/0
         , list_global_packages/0
         , list_global_matching/1
@@ -21,14 +22,14 @@
 
 -include("epm.hrl").
 
--define(local_index, epm_local_index).
--define(local_index_file, "epm_local_index").
+-define(local_pkgs, epm_local_index).
+-define(local_pkgs_db, "epm_local_index").
 
--define(global_index, epm_index).
--define(global_index_file, "epm_packages").
+-define(global_pkgs, epm_index).
+-define(global_pkgs_db, "epm_packages").
 
-%% -define(global_repo_index, epm_repo_index).
-%% -define(global_repo_index_file, "epm_repos").
+-define(global_repos, epm_repos).
+-define(global_repos_db, "epm_repos").
 
 %%------------------------------------------------------------------------------
 is_installed(Id=#pkgid{}) ->
@@ -39,54 +40,78 @@ close() -> ok.
 
 
 open(_Home, EpmHome) ->
-  G1 = open_dets_file(filename:join([EpmHome, ?global_index_file])),
-  ets:new(?global_index, [named_table, {keypos, #pkg.id}]),
-  lists:foreach(fun(X1) -> ets:insert(?global_index, X1) end, G1),
+  PkgDb = open_dets_file(filename:join([EpmHome, ?global_pkgs_db])),
+  ets:new(?global_pkgs, [named_table, {keypos, #pkg.id}]),
+  lists:foreach(fun(X1) -> ets:insert(?global_pkgs, X1) end, PkgDb),
 
-  %% Fixtures
+  RepoDb = open_dets_file(filename:join([EpmHome, ?global_repos_db])),
+  ets:new(?global_repos, [named_table, {keypos, #repo.id}]),
+  lists:foreach(fun(X3) -> ets:insert(?global_repos, X3) end, RepoDb),
+
+  %% Pkgid Fixtures
   CowboyId = #pkgid{author="extend", pkg_name="cowboy", vsn="2.7", platform=x64},
   Cowboy2Id = #pkgid{author="derp", pkg_name="cowboy", vsn="2.6"},
   RanchId = #pkgid{pkg_name="ranch", vsn="1.1"},
   GunId = #pkgid{pkg_name="gun", vsn="0.1-dev", platform=x86},
   FwId = #pkgid{pkg_name="farwest", vsn="1a"},
   OtherId = #pkgid{pkg_name="other", erlang_vsn="r13b"},
-  ets:insert(?global_index, #pkg{id=CowboyId, deps=[RanchId]}),
-  ets:insert(?global_index, #pkg{id=Cowboy2Id, deps=[RanchId]}),
-  ets:insert(?global_index, #pkg{id=RanchId, deps=[GunId]}),
-  ets:insert(?global_index, #pkg{id=GunId}),
-  ets:insert(?global_index, #pkg{id=FwId}),
-  ets:insert(?global_index, #pkg{id=OtherId}),
 
-  G2 = open_dets_file(?local_index_file),
-  ets:new(?local_index, [named_table, {keypos, #pkg.id}]),
-  lists:foreach(fun(X2) -> ets:insert(?local_index, X2) end, G2),
-  ets:insert(?local_index, #pkg{id=GunId}),
+  %% Repo Fixtures
+  Repo1Id = #repoid{name="github"},
+  ets:insert(?global_repos, #repo{id=Repo1Id, api_module=epm_vcs_git}),
+  Repo2Id = #repoid{name="git"},
+  ets:insert(?global_repos, #repo{id=Repo2Id, api_module=epm_vcs_git}),
+
+  %% Pkg Fixtures
+  ets:insert(?global_pkgs, #pkg{id=CowboyId, deps=[RanchId], repo=Repo1Id}),
+  ets:insert(?global_pkgs, #pkg{id=Cowboy2Id, deps=[RanchId]}),
+  ets:insert(?global_pkgs, #pkg{id=RanchId, deps=[GunId]}),
+  ets:insert(?global_pkgs, #pkg{id=GunId}),
+  ets:insert(?global_pkgs, #pkg{id=FwId}),
+  ets:insert(?global_pkgs, #pkg{id=OtherId}),
+
+  LocalPkgDb = open_dets_file(?local_pkgs_db),
+  ets:new(?local_pkgs, [named_table, {keypos, #pkg.id}]),
+  lists:foreach(fun(X2) -> ets:insert(?local_pkgs, X2) end, LocalPkgDb),
+  ets:insert(?local_pkgs, #pkg{id=GunId}),
 
   State = #epm_state{},
   State.
 
+get_repo(Id=#repoid{}) ->
+  case ets:lookup(?global_repos, Id) of
+    []     -> not_found;
+    [Repo] -> Repo
+  end.
+
+get_pkg(Id=#pkgid{}) ->
+  case ets:lookup(?global_pkgs, Id) of
+    []    -> not_found;
+    [Pkg] -> Pkg
+  end.
+
 %% @doc List all installed packages in local index
 list_local_packages() ->
-  ets:match(?local_index, '$1').
+  ets:match(?local_pkgs, '$1').
 
 %% @doc List all available packages in global index
 list_global_packages() ->
-  ets:match(?global_index, '$1').
+  ets:match(?global_pkgs, '$1').
 
 %% @doc Search local index (installed)
 list_local_matching(Id=#pkgid{}) ->
   Q = epm:pkgid_match_spec(Id),
-  ets:select(?local_index, Q).
+  ets:select(?local_pkgs, Q).
 
 list_global_matching(Id=#pkgid{}) ->
   Q = epm:pkgid_match_spec(Id),
-  ets:select(?global_index, Q).
+  ets:select(?global_pkgs, Q).
 
 delete_local(Key={_User, _Name, _Vsn}) ->
-  ets:delete(?global_index, Key).
+  ets:delete(?global_pkgs, Key).
 
 insert_local(Key={_User, _Name, _Vsn}, Package=#pkg{}) ->
-  ets:insert(?global_index, {Key, Package}).
+  ets:insert(?global_pkgs, {Key, Package}).
 
 %% @private
 open_dets_file(File) ->

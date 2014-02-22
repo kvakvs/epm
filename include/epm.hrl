@@ -12,8 +12,9 @@
 -define(EPM_EXIT(Format, Args), begin exit({ok, epm:s(Format, Args)}) end).
 
 -type platform() :: x86 | x64 | ?any_platform.
--type erlangvsn() :: binary().
--type api_module() :: epm_api_github.
+-type erlangvsn() :: string().
+-type api_module() :: epm_vcs % autodetect
+                    | epm_vcs_git | epm_vcs_github.
 -type pkg_arg() :: source | {tag|branch|hash, string()}.
 
 -record(repoid, { name :: string()
@@ -31,17 +32,19 @@
                }).
 -type pkgid() :: #pkgid{}.
 
+%% Repository: Specifies only title and base URL for api_module to use.
 -record(repo, { id :: repoid()
               , description :: string()
               , url :: string()
               %, followers
               %, pushed
-              , api_module=epm_api_github :: api_module()
+              , api_module=epm_vcs :: api_module()
               }).
 -type repo() :: #repo{}.
 
+%% Package: Does not specify branches/tags as this info is queried from package
+%% repository online.
 -record(pkg, { id :: pkgid()
-             %, vsn=undefined :: string()
              , install_dir :: string()
              , deps=[] :: [pkgid()]
              , args=[] :: list()

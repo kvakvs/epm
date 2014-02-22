@@ -28,18 +28,6 @@ init() ->
     case file:path_consult(["."] ++ Home ++ [code:root_dir()], ".epm") of
       {ok, [C], _FileLoc} ->
         io:format("epm v~s, ~p~n~n", [?epm_version, ?epm_year]),
-
-        case proplists:get_value(install_dir, C) of
-          undefined ->
-            io:format("################ Warning ################~n"),
-            io:format("You have not specified a value for ~n"),
-            io:format("install_dir in your .epm config file. The~n"),
-            io:format("current working directory will be used.~n~n"),
-            io:format("run `epm config --set install_dir <path>`~n"),
-            io:format("#########################################~n~n"),
-            ok;
-          InstallDir -> epm_util:add_to_path(InstallDir)
-        end,
         C;
       {ok, [], _FileLoc} -> [];
       {error, enoent} ->
@@ -48,7 +36,17 @@ init() ->
       {error, Reason} ->
         ?EPM_FAIL("failed to read epm global config: ~p", [Reason])
     end,
-  lists:foreach(fun({K, V}) -> set(K, V) end, GlobalConfig).
+  lists:foreach(fun({K, V}) -> set(K, V) end, GlobalConfig),
+  case ?MODULE:get(install_dir) of
+    {error, not_found} ->
+      epm:p(dark_red, "Warning"),
+      epm:p("You have not specified a value for install_dir in your .epm "
+      "config file.~n'deps/' will be used.~nRun `epm config --set "
+      "install_dir <path>`~n"),
+      ?MODULE:set(install_dir, "deps/"),
+      ok;
+    {ok, _} -> ok
+  end.
 
 set(Key, Value) ->
   ets:insert(?cfg_table, {Key, Value}).
