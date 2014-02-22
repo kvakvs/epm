@@ -83,7 +83,7 @@ set_net_timeout(Timeout) when is_integer(Timeout) ->
 %%   [{timeout, T}].
 
 epm_home_dir(Home) ->
-  EPM = filename:join([Home, "epm"]),
+  EPM = filename:join([Home, ".epm"]),
   case filelib:is_dir(EPM) of
     true -> EPM;
     false ->

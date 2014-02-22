@@ -8,3 +8,4 @@ epm
 *.plt
 *.log
 epm_local_index
+erl_crash.dump

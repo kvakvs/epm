@@ -7,7 +7,7 @@
 -module(epm_cfg).
 
 %% API
--export([init/0
+-export([init/1
         , set/2
         , get/1
         , get/2
@@ -17,19 +17,18 @@
 -include("epm.hrl").
 -define(cfg_table, epm_cfg).
 
-init() ->
+init(EpmHome) ->
   ets:new(?cfg_table, [named_table]),
 
   Home = epm_util:home_dir(),
   set(vsn, ?epm_version),
 
   %% consult global .epm config file in home directory
-  GlobalConfig =
-    case file:path_consult(["."] ++ Home ++ [code:root_dir()], ".epm") of
-      {ok, [C], _FileLoc} ->
+  GlobalConfig = case file:consult(filename:join([EpmHome, "epm.conf"])) of
+      {ok, [C]} ->
         io:format("epm v~s, ~p~n~n", [?epm_version, ?epm_year]),
         C;
-      {ok, [], _FileLoc} -> [];
+      {ok, []} -> [];
       {error, enoent} ->
         file:write_file(filename:join([Home, ".epm"]), <<>>),
         [];

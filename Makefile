@@ -2,6 +2,10 @@
 compile:
 	rebar get-deps compile escriptize
 
+.PHONY: run
+run: compile
+	erl -pa ebin -s epm
+
 .PHONY: clean
 clean:
 	rm ebin/* *.log

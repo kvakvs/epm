@@ -17,7 +17,7 @@
                     | epm_vcs_git | epm_vcs_github.
 -type pkg_arg() :: source | {tag|branch|hash, string()}.
 
--record(repoid, { name :: string()
+-record(repoid, { name=erlang:error(name_not_set) :: nonempty_string()
                 }).
 -type repoid() :: #repoid{}.
 
@@ -33,27 +33,25 @@
 -type pkgid() :: #pkgid{}.
 
 %% Repository: Specifies only title and base URL for api_module to use.
--record(repo, { id :: repoid()
+-record(repo, { id=erlang:error(id_not_set) :: repoid()
               , description :: string()
               , url :: string()
-              %, followers
-              %, pushed
+              , short_name=erlang:error(short_name_not_set) :: nonempty_string()
               , api_module=epm_vcs :: api_module()
               }).
 -type repo() :: #repo{}.
 
 %% Package: Does not specify branches/tags as this info is queried from package
 %% repository online.
--record(pkg, { id :: pkgid()
-             , install_dir :: string()
+-record(pkg, { id=erlang:error(id_not_set) :: pkgid()
              , deps=[] :: [pkgid()]
              , args=[] :: list()
-             , repo :: repoid()
+             , repo=erlang:error(repo_not_set) :: repoid()
              }).
 -type pkg() :: #pkg{}.
 
--record(installed_pkg, { id :: pkgid()
-                       , repository :: repoid()
+-record(installed_pkg, { id=erlang:error(id_not_set) :: pkgid()
+                       , repository=erlang:error(repo_not_set) :: repoid()
                        , platform :: platform()
                        }).
 -type installed_pkg() :: #installed_pkg{}.

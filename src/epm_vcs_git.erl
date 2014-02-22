@@ -13,9 +13,10 @@
 -include("epm.hrl").
 
 -spec get_source(Pkg :: pkg(), DestDir :: string()) -> ok | {error, any()}.
-get_source(Pkg=#pkg{id=#pkgid{author=A, pkg_name=N}}, DestDir) ->
+get_source(Pkg, DestDir) ->
   Url = get_vcs_url(Pkg),
-  Path = filename:join([DestDir, epm:s("~s_~s", [A, N])]),
+  Path = filename:join([DestDir, epm_vcs:install_dir_name(Pkg)]),
+  %% TODO: versions, tags
   epm_util:git(["clone", Url, Path]),
   ok.
 

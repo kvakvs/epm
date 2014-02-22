@@ -8,7 +8,7 @@
 -module(epm_index).
 
 %% API
--export([open/2
+-export([open/1
         , delete_local/1
         , insert_local/2
         , close/0
@@ -38,42 +38,34 @@ is_installed(Id=#pkgid{}) ->
 
 close() -> ok.
 
-
-open(_Home, EpmHome) ->
-  PkgDb = open_dets_file(filename:join([EpmHome, ?global_pkgs_db])),
-  ets:new(?global_pkgs, [named_table, {keypos, #pkg.id}]),
-  lists:foreach(fun(X1) -> ets:insert(?global_pkgs, X1) end, PkgDb),
-
-  RepoDb = open_dets_file(filename:join([EpmHome, ?global_repos_db])),
-  ets:new(?global_repos, [named_table, {keypos, #repo.id}]),
-  lists:foreach(fun(X3) -> ets:insert(?global_repos, X3) end, RepoDb),
+open(EpmHome) ->
+  create_and_load(EpmHome),
 
   %% Pkgid Fixtures
   CowboyId = #pkgid{author="extend", pkg_name="cowboy", vsn="2.7", platform=x64},
   Cowboy2Id = #pkgid{author="derp", pkg_name="cowboy", vsn="2.6"},
-  RanchId = #pkgid{pkg_name="ranch", vsn="1.1"},
-  GunId = #pkgid{pkg_name="gun", vsn="0.1-dev", platform=x86},
-  FwId = #pkgid{pkg_name="farwest", vsn="1a"},
+  RanchId = #pkgid{author="extend", pkg_name="ranch", vsn="1.1"},
+  GunId = #pkgid{author="extend", pkg_name="gun", vsn="0.1-dev", platform=x86},
+  FwId = #pkgid{author="extend", pkg_name="farwest", vsn="1a"},
   OtherId = #pkgid{pkg_name="other", erlang_vsn="r13b"},
 
   %% Repo Fixtures
-  Repo1Id = #repoid{name="github"},
-  ets:insert(?global_repos, #repo{id=Repo1Id, api_module=epm_vcs_git}),
-  Repo2Id = #repoid{name="git"},
-  ets:insert(?global_repos, #repo{id=Repo2Id, api_module=epm_vcs_git}),
+  Github = #repoid{name="github"},
+  ets:insert(?global_repos, #repo{ id=Github, api_module=epm_vcs_git
+                                 , short_name="github" }),
+  Git = #repoid{name="git"},
+  ets:insert(?global_repos, #repo{ id=Git, api_module=epm_vcs_git
+                                 , short_name="git" }),
 
   %% Pkg Fixtures
-  ets:insert(?global_pkgs, #pkg{id=CowboyId, deps=[RanchId], repo=Repo1Id}),
-  ets:insert(?global_pkgs, #pkg{id=Cowboy2Id, deps=[RanchId]}),
-  ets:insert(?global_pkgs, #pkg{id=RanchId, deps=[GunId]}),
-  ets:insert(?global_pkgs, #pkg{id=GunId}),
-  ets:insert(?global_pkgs, #pkg{id=FwId}),
-  ets:insert(?global_pkgs, #pkg{id=OtherId}),
+  ets:insert(?global_pkgs, #pkg{id=CowboyId, deps=[RanchId], repo=Github}),
+  ets:insert(?global_pkgs, #pkg{id=Cowboy2Id, deps=[RanchId], repo=Github}),
+  ets:insert(?global_pkgs, #pkg{id=RanchId, deps=[GunId], repo=Github}),
+  ets:insert(?global_pkgs, #pkg{id=GunId, repo=Github}),
+  ets:insert(?global_pkgs, #pkg{id=FwId, repo=Github}),
+  ets:insert(?global_pkgs, #pkg{id=OtherId, repo=Git}),
 
-  LocalPkgDb = open_dets_file(?local_pkgs_db),
-  ets:new(?local_pkgs, [named_table, {keypos, #pkg.id}]),
-  lists:foreach(fun(X2) -> ets:insert(?local_pkgs, X2) end, LocalPkgDb),
-  ets:insert(?local_pkgs, #pkg{id=GunId}),
+  %ets:insert(?local_pkgs, #pkg{id=GunId}),
 
   State = #epm_state{},
   State.
@@ -126,3 +118,16 @@ open_dets_file(File) ->
   Objects = dets:match(epm_temporary, '$1'),
   dets:close(epm_temporary),
   Objects.
+
+create_and_load(EpmHome) ->
+  PkgDb = open_dets_file(filename:join([EpmHome, ?global_pkgs_db])),
+  ets:new(?global_pkgs, [named_table, {keypos, #pkg.id}]),
+  lists:foreach(fun(X1) -> ets:insert(?global_pkgs, X1) end, PkgDb),
+
+  RepoDb = open_dets_file(filename:join([EpmHome, ?global_repos_db])),
+  ets:new(?global_repos, [named_table, {keypos, #repo.id}]),
+  lists:foreach(fun(X3) -> ets:insert(?global_repos, X3) end, RepoDb),
+
+  LocalPkgDb = open_dets_file(?local_pkgs_db),
+  ets:new(?local_pkgs, [named_table, {keypos, #pkg.id}]),
+  lists:foreach(fun(X2) -> ets:insert(?local_pkgs, X2) end, LocalPkgDb).

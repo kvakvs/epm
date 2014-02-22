@@ -1,5 +1,5 @@
 -module(epm).
--export([main/1
+-export([ start/0, main/1
         , author/1
         , name/1
         , vsn/1
@@ -13,6 +13,10 @@
 -include("epm.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
 
+start() ->
+  %% Debug
+  main(["install", "cowboy"]).
+
 main(Args) ->
   application:load(sasl),
   application:set_env(sasl, sasl_error_logger, false),
@@ -20,19 +24,19 @@ main(Args) ->
            , [sasl, crypto, public_key, ssl, ibrowse, epm]),
 
   case (catch main_internal(Args)) of
-    {'EXIT', {ok, Msg}} when is_list(Msg)    -> epm:p(red, "- ~s~n", [Msg]);
-    {'EXIT', {error, Msg}} when is_list(Msg) -> epm:p(green, "- ~s~n", [Msg]);
-    {'EXIT', Other}                      -> epm:p(dark_cyan, "~p~n", [Other]);
+    {'EXIT', {ok, Msg}} when is_list(Msg)    -> epm:p(green, "OK ~s~n", [Msg]);
+    {'EXIT', {error, Msg}} when is_list(Msg) -> epm:p(red, "ERROR ~s~n", [Msg]);
+    {'EXIT', Other}                   -> epm:p(dark_cyan, "EXIT ~p~n", [Other]);
     _ -> ok
   end,
   epm_index:close(),
 	io:format("~n").
 
 main_internal(Args) ->
-  epm_cfg:init(),
   Home = epm_util:home_dir(),
   EpmHome = epm_util:epm_home_dir(Home),
-  State = epm_index:open(Home, EpmHome),
+  epm_cfg:init(EpmHome),
+  State = epm_index:open(EpmHome),
   setup_proxy(),
   epm_core:execute(State, Args).
 
