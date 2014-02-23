@@ -3,7 +3,9 @@
 
 -include("epm.hrl").
 
--callback get_source(Pkg :: pkg(), DestDir :: string()) -> ok | {error, any()}.
+-callback get_source(Pkg :: pkg:pkg()
+                    , DestDir :: string()
+                    ) -> ok | {error, any()}.
 
 %behaviour_info(callbacks) -> [ {get_source, 2} ];
 %behaviour_info(_) -> undefined.

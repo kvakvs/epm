@@ -12,8 +12,11 @@
 
 -include("epm.hrl").
 
--spec get_source(Pkg :: pkg(), DestDir :: string()) -> ok | {error, any()}.
-get_source(Pkg=#pkg{repo=RepoId}, DestDir) ->
+-spec get_source(Pkg :: pkg:pkg()
+                , DestDir :: string()
+                ) -> ok | {error, any()}.
+get_source(Pkg, DestDir) when ?IS_PKG(Pkg) ->
+  RepoId = pkg:repo(Pkg),
   %% TODO: auto detection for git/svn protocol
   case epm_index:get_repo(RepoId) of
     not_found ->
@@ -27,6 +30,10 @@ get_source(Pkg=#pkg{repo=RepoId}, DestDir) ->
 
 %% @doc Naming scheme for local install
 %% TODO: Configure naming format per project/per user
-install_dir_name(#pkg{id=#pkgid{author=A, pkg_name=N}, repo=RepoId}) ->
+install_dir_name(Pkg) when ?IS_PKG(Pkg) ->
+  Id     = pkg:id(Pkg),
+  RepoId = pkg:repo(Pkg),
+  A = pkgid:author(Id),
+  N = pkgid:pkg_name(Id),
   #repo{short_name=RepoSN} = epm_index:get_repo(RepoId),
   epm:s("~s.~s.~s", [N, A, RepoSN]).

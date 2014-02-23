@@ -12,7 +12,9 @@
 
 -include("epm.hrl").
 
--spec get_source(Pkg :: pkg(), DestDir :: string()) -> ok | {error, any()}.
+-spec get_source(Pkg :: pkg:pkg()
+                , DestDir :: string()
+                ) -> ok | {error, any()}.
 get_source(Pkg, DestDir) ->
   Url = get_vcs_url(Pkg),
   Path = filename:join([DestDir, epm_vcs:install_dir_name(Pkg)]),
@@ -20,7 +22,11 @@ get_source(Pkg, DestDir) ->
   epm_util:git(["clone", Url, Path]),
   ok.
 
-get_vcs_url(#pkg{id=#pkgid{author=?any_author}}) -> {error, author};
-get_vcs_url(#pkg{id=#pkgid{pkg_name=?any_name}}) -> {error, pkg_name};
-get_vcs_url(#pkg{id=#pkgid{author=A, pkg_name=N}}) ->
-  epm:s("https://github.com/~s/~s.git", [A, N]).
+get_vcs_url(Pkg) when ?IS_PKG(Pkg) ->
+  Pkgid = pkg:id(Pkg),
+  Author = pkgid:author(Pkgid),
+  Name = pkgid:pkg_name(Pkgid),
+  if Author =:= ?any_author -> {error, author};
+     Name   =:= ?any_name   -> {error, pkg_name};
+     true -> epm:s("https://github.com/~s/~s.git", [Author, Name])
+  end.

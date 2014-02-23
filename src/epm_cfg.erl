@@ -24,6 +24,7 @@ init(EpmHome) ->
   set(vsn, ?epm_version),
 
   %% consult global .epm config file in home directory
+  %% TODO: Allow epm.conf to override dir-local -> user-global -> system-global
   GlobalConfig = case file:consult(filename:join([EpmHome, "epm.conf"])) of
       {ok, [C]} ->
         io:format("epm v~s, ~p~n~n", [?epm_version, ?epm_year]),

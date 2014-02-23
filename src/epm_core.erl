@@ -85,7 +85,7 @@ execute(State=#epm_state{}, ["info" | Args]) ->
       io:format("INSTALLED~n"),
       io:format("===============================~n"),
 
-      F = fun(Package=#pkg{}, Count) ->
+      F = fun(Package, Count) when ?IS_PKG(Package) ->
             case Count of
               0 -> ok;
               _ -> io:format("~n")
@@ -202,15 +202,15 @@ execute(_State=#epm_state{}, _) ->
 %% -----------------------------------------------------------------------------
 
 -spec collect_args(Target :: atom(), Args :: [string()])
-      -> {[#pkgid{}], [atom()]}.
+      -> {[pkgid:pkgid()], [atom()]}.
 collect_args(Target, Args) ->
   collect_args_internal(Target, Args, [], []).
 
 -spec collect_args_internal(Target :: atom()
                            , Args :: [string()]
-                           , Pkgids :: [#pkgid{}]
+                           , Pkgids :: [pkgid:pkgid()]
                            , Flags :: [atom()])
-      -> {[#pkgid{}], [atom()]}.
+      -> {[pkgid:pkgid()], [atom()]}.
 collect_args_internal(_, [], Packages, Flags) ->
   {lists:reverse(Packages), lists:reverse(Flags)};
 collect_args_internal(Target, [Arg | Rest], Pkgids, Flags) ->
@@ -218,15 +218,17 @@ collect_args_internal(Target, [Arg | Rest], Pkgids, Flags) ->
     undefined -> %% if not a tag then must be a project name
       %% split into user and project
       {ProjectName, User} = epm_ops:split_package(Arg),
-      collect_args_internal(Target, Rest
-                          , [#pkgid{author=User, pkg_name=ProjectName}|Pkgids]
-                          , Flags);
+      NewP0 = pkgid:new(),
+      NewP1 = pkgid:set(author, User, NewP0),
+      NewP  = pkgid:set(pkg_name, ProjectName, NewP1),
+      collect_args_internal(Target, Rest, [NewP|Pkgids], Flags);
     {Type, Tag, 0} ->   %% tag with no trailing value
       case Type of
         project ->
           %% Update head of Pkgids with additional arg
-          [#pkgid{args=Args} = Pkgid|Tail] = Pkgids,
-          Pkgid1 = Pkgid#pkgid{ args = Args ++ [Tag] },
+          [Pkgid|Tail] = Pkgids,
+          Args = pkgid:args(Pkgid),
+          Pkgid1 = pkgid:set(args, Args ++ [Tag], Pkgid),
           collect_args_internal(Target, Rest, [Pkgid1 | Tail], Flags);
         global ->
           collect_args_internal(Target, Rest, Pkgids, [Tag|Flags])
@@ -245,12 +247,14 @@ collect_args_internal(Target, [Arg | Rest], Pkgids, Flags) ->
         project ->
           %% Update head of Pkgids with additional arg
           %% this tag applies to the last project on the stack
-          [#pkgid{args=Args}=Pkgid | Tail] = Pkgids,
+          [Pkgid|Tail] = Pkgids,
+          Args = pkgid:args(Pkgid),
           Vsn = if Tag == tag; Tag == branch; Tag == hash -> Vals1;
-                  true -> Pkgid#pkgid.vsn
+                  true -> pkgid:vsn(Pkgid)
                 end,
-          Pkgid2 = Pkgid#pkgid{ vsn = Vsn, args = Args ++ [{Tag, Vals1}] },
-          collect_args_internal( Target, Rest1, [Pkgid2 | Tail], Flags);
+          Pkgid2 = pkgid:set(vsn, Vsn, Pkgid),
+          Pkgid3 = pkgid:set(args, Args ++ [{Tag, Vals1}], Pkgid2),
+          collect_args_internal( Target, Rest1, [Pkgid3 | Tail], Flags);
         global ->
           if Tag == config_set ->
               [K, V1] = Vals1,

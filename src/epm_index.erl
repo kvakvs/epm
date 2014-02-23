@@ -32,9 +32,8 @@
 -define(global_repos_db, "epm_repos").
 
 %%------------------------------------------------------------------------------
-is_installed(Id=#pkgid{}) ->
-  [] =/=  list_local_matching(Id).
-
+is_installed(PkgId) when ?IS_PKGID(PkgId) ->
+  [] =/=  list_local_matching(PkgId).
 
 close() -> ok.
 
@@ -42,12 +41,11 @@ open(EpmHome) ->
   create_and_load(EpmHome),
 
   %% Pkgid Fixtures
-  CowboyId = #pkgid{author="extend", pkg_name="cowboy", vsn="2.7", platform=x64},
-  Cowboy2Id = #pkgid{author="derp", pkg_name="cowboy", vsn="2.6"},
-  RanchId = #pkgid{author="extend", pkg_name="ranch", vsn="1.1"},
-  GunId = #pkgid{author="extend", pkg_name="gun", vsn="0.1-dev", platform=x86},
-  FwId = #pkgid{author="extend", pkg_name="farwest", vsn="1a"},
-  OtherId = #pkgid{pkg_name="other", erlang_vsn="r13b"},
+  CowboyId = pkgid:fixture_("extend", "cowboy", "1.0", x64),
+  Cowboy2Id = pkgid:fixture_("derp", "cowboy", "1.1"),
+  RanchId = pkgid:fixture_("extend", "ranch", "0.3"),
+  GunId = pkgid:fixture_("extend", "gun", "0.1", x86),
+  FwId = pkgid:fixture_("extend", "farwest", "1a"),
 
   %% Repo Fixtures
   Github = #repoid{name="github"},
@@ -58,12 +56,11 @@ open(EpmHome) ->
                                  , short_name="git" }),
 
   %% Pkg Fixtures
-  ets:insert(?global_pkgs, #pkg{id=CowboyId, deps=[RanchId], repo=Github}),
-  ets:insert(?global_pkgs, #pkg{id=Cowboy2Id, deps=[RanchId], repo=Github}),
-  ets:insert(?global_pkgs, #pkg{id=RanchId, deps=[GunId], repo=Github}),
-  ets:insert(?global_pkgs, #pkg{id=GunId, repo=Github}),
-  ets:insert(?global_pkgs, #pkg{id=FwId, repo=Github}),
-  ets:insert(?global_pkgs, #pkg{id=OtherId, repo=Git}),
+  ets:insert(?global_pkgs, pkg:fixture_(CowboyId, [RanchId], Github)),
+  ets:insert(?global_pkgs, pkg:fixture_(Cowboy2Id, [RanchId], Github)),
+  ets:insert(?global_pkgs, pkg:fixture_(RanchId, [GunId], Github)),
+  ets:insert(?global_pkgs, pkg:fixture_(GunId, [], Github)),
+  ets:insert(?global_pkgs, pkg:fixture_(FwId, [], Github)),
 
   %ets:insert(?local_pkgs, #pkg{id=GunId}),
 
@@ -76,8 +73,8 @@ get_repo(Id=#repoid{}) ->
     [Repo] -> Repo
   end.
 
-get_pkg(Id=#pkgid{}) ->
-  case ets:lookup(?global_pkgs, Id) of
+get_pkg(Pkgid) when ?IS_PKGID(Pkgid) ->
+  case ets:lookup(?global_pkgs, Pkgid) of
     []    -> not_found;
     [Pkg] -> Pkg
   end.
@@ -91,18 +88,18 @@ list_global_packages() ->
   ets:match(?global_pkgs, '$1').
 
 %% @doc Search local index (installed)
-list_local_matching(Id=#pkgid{}) ->
-  Q = epm:pkgid_match_spec(Id),
+list_local_matching(Pkgid) when ?IS_PKGID(Pkgid) ->
+  Q = epm:pkgid_match_spec(Pkgid),
   ets:select(?local_pkgs, Q).
 
-list_global_matching(Id=#pkgid{}) ->
-  Q = epm:pkgid_match_spec(Id),
+list_global_matching(Pkgid) when ?IS_PKGID(Pkgid) ->
+  Q = epm:pkgid_match_spec(Pkgid),
   ets:select(?global_pkgs, Q).
 
 delete_local(Key={_User, _Name, _Vsn}) ->
   ets:delete(?global_pkgs, Key).
 
-insert_local(Key={_User, _Name, _Vsn}, Package=#pkg{}) ->
+insert_local(Key={_User, _Name, _Vsn}, Package) when ?IS_PKG(Package) ->
   ets:insert(?global_pkgs, {Key, Package}).
 
 %% @private
@@ -121,7 +118,7 @@ open_dets_file(File) ->
 
 create_and_load(EpmHome) ->
   PkgDb = open_dets_file(filename:join([EpmHome, ?global_pkgs_db])),
-  ets:new(?global_pkgs, [named_table, {keypos, #pkg.id}]),
+  ets:new(?global_pkgs, [named_table, {keypos, pkg:field_position(id)}]),
   lists:foreach(fun(X1) -> ets:insert(?global_pkgs, X1) end, PkgDb),
 
   RepoDb = open_dets_file(filename:join([EpmHome, ?global_repos_db])),
@@ -129,5 +126,5 @@ create_and_load(EpmHome) ->
   lists:foreach(fun(X3) -> ets:insert(?global_repos, X3) end, RepoDb),
 
   LocalPkgDb = open_dets_file(?local_pkgs_db),
-  ets:new(?local_pkgs, [named_table, {keypos, #pkg.id}]),
+  ets:new(?local_pkgs, [named_table, {keypos, pkg:field_position(id)}]),
   lists:foreach(fun(X2) -> ets:insert(?local_pkgs, X2) end, LocalPkgDb).

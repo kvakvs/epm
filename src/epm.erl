@@ -1,14 +1,7 @@
 -module(epm).
--export([ start/0, main/1
-        , author/1
-        , name/1
-        , vsn/1
-        , erlang_vsn/1
-        , as_string/1
-        , matches/2
-        , platform/1
-        , p/3, p/2, p/1
-        , s/2, pkgid_match_spec/1, args/1, arg_bool/2, arg/2, set_arg_bool/3]).
+-export([start/0, main/1
+        , p/3, p/2, p/1, s/2
+        , as_string/1]).
 
 -include("epm.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
@@ -46,73 +39,38 @@ setup_proxy() ->
   epm_util:set_net_timeout(epm_cfg:get(net_timeout, 6000)).
 
 %%------------------------------------------------------------------------------
-author(#pkg{id=#pkgid{author=X}}) -> X;
-author(#pkgid{author=X}) -> X.
+%% author(#pkg{id=Id}) -> pkgid:author(Id);
+%% author(#pkgid{author=X}) -> X.
+%%
+%% name(#pkg{id=#pkgid{pkg_name=X}}) -> X;
+%% name(#pkgid{pkg_name=X}) -> X;
+%% name(#repo{id=#repoid{name=X}}) -> X.
+%%
+%% vsn(#pkg{id=#pkgid{vsn=X}}) -> X;
+%% vsn(#pkgid{vsn=X}) -> X.
+%%
+%% platform(#pkg{id=#pkgid{platform=X}}) -> X;
+%% platform(#pkgid{platform=X}) -> X.
+%%
+%% erlang_vsn(#pkg{id=#pkgid{erlang_vsn=X}}) -> X;
+%% erlang_vsn(#pkgid{erlang_vsn=X}) -> X.
+%%
+%% args(#pkgid{args=X}) -> X.
 
-name(#pkg{id=#pkgid{pkg_name=X}}) -> X;
-name(#pkgid{pkg_name=X}) -> X;
-name(#repo{id=#repoid{name=X}}) -> X.
+%% arg_bool(Arg, #pkgid{args=X}) -> lists:member(Arg, X).
 
-vsn(#pkg{id=#pkgid{vsn=X}}) -> X;
-vsn(#pkgid{vsn=X}) -> X.
+%% arg(Arg, #pkgid{args=X}) -> proplists:get_value(Arg, X).
 
-platform(#pkg{id=#pkgid{platform=X}}) -> X;
-platform(#pkgid{platform=X}) -> X.
-
-erlang_vsn(#pkg{id=#pkgid{erlang_vsn=X}}) -> X;
-erlang_vsn(#pkgid{erlang_vsn=X}) -> X.
-
-args(#pkgid{args=X}) -> X.
-
-arg_bool(Arg, #pkgid{args=X}) -> lists:member(Arg, X).
-
-arg(Arg, #pkgid{args=X}) -> proplists:get_value(Arg, X).
-
-set_arg_bool(Arg, false, #pkgid{args=Args}=Pkgid) ->
-  Pkgid#pkgid{args = lists:delete(Arg, Args)};
-set_arg_bool(Arg, true, #pkgid{args=Args}=Pkgid) ->
-  Pkgid#pkgid{args = [Arg | lists:delete(Arg, Args)]}.
+%% set_arg_bool(Arg, false, #pkgid{args=Args}=Pkgid) ->
+%%   Pkgid#pkgid{args = lists:delete(Arg, Args)};
+%% set_arg_bool(Arg, true, #pkgid{args=Args}=Pkgid) ->
+%%   Pkgid#pkgid{args = [Arg | lists:delete(Arg, Args)]}.
 
 %%------------------------------------------------------------------------------
-as_string(#pkg{id=Id}) -> as_string(Id);
-as_string(#pkgid{ author=A, pkg_name=N, vsn=V, platform=P, erlang_vsn=E
-                , args=Args}) ->
-  "["
-    ++ case A of ?any_author -> ""; _ -> s("~s/", [A]) end
-    ++ N
-    ++ case V of ?any_vsn -> ""; _ -> s(", ~s", [V]) end
-    ++ case P of ?any_platform -> ""; _ -> s(", ~s", [P]) end
-    ++ case E of ?any_erlang_vsn -> ""; _ -> s(", ~s", [E]) end
-    ++ case Args of [] -> ""; _ -> s(" ~p", [Args]) end
-    ++ "]";
 as_string(#repo{id=I, description=_D, url=U}) ->
   s("[Repo ~s url=~s]", [I, U]);
 as_string(#repoid{name=N}) ->
   s("[Repo id ~s]", [N]).
-
-%% @doc Checks that P1 with some wildcard fields matches P2
-matches(#pkgid{}=P1, #pkgid{}=P2) ->
-  P1Author = author(P1),
-  P1V = vsn(P1),
-  P1Erlang = erlang_vsn(P1),
-  P1Platf = platform(P1),
-  ( name(P1) =:= name(P2)
-    andalso (P1Author =:= author(P2) orelse P1Author =:= ?any_author)
-    andalso (P1V =:= vsn(P2) orelse P1V =:= ?any_vsn)
-    andalso (P1Erlang =:= erlang_vsn(P2) orelse P1Erlang =:= ?any_erlang_vsn)
-    andalso (P1Platf =:= platform(P2) orelse P1Platf =:= ?any_platform)
-    ).
-
-pkgid_match_spec(#pkgid{ author=A1, pkg_name=N1, platform=P1
-                       , vsn=V1, erlang_vsn=E1}) ->
-  ets:fun2ms(fun(#pkg{id=#pkgid{ author=A2, pkg_name=N2, platform=P2
-                               , vsn=V2, erlang_vsn=E2}}=Pkg)
-      when (N1 =:= N2
-          andalso (A1 =:= A2 orelse A1 =:= ?any_author)
-          andalso (V1 =:= V2 orelse V1 =:= ?any_vsn)
-          andalso (E1 =:= E2 orelse E1 =:= ?any_erlang_vsn)
-          andalso (P1 =:= P2 orelse P1 =:= ?any_platform)
-    ) -> Pkg end).
 
 %%------------------------------------------------------------------------------
 %% @doc Uncolored print
