@@ -13,17 +13,10 @@
         , as_string/1, matches/2, pkgid_match_spec/1
         , fixture_/3, fixture_/4]).
 
+-include_lib("stdlib/include/ms_transform.hrl").
 -include("epm.hrl").
+-include("epm_private_records.hrl").
 
-%% Unified global identifier for package
--record(pkgid, { author     = ?any_author     :: string()    | ?any_author
-               , pkg_name   = ?any_name       :: string()    | ?any_name
-               , platform   = ?any_platform   :: platform()
-               , vsn        = ?any_vsn        :: string()    | ?any_vsn
-               , erlang_vsn = ?any_erlang_vsn :: erlangvsn() | ?any_erlang_vsn
-  %% arguments passed from command line, like: source, {tag|branch|hash, x}
-               , args=[] :: [pkg_arg()]
-               }).
 -type pkgid() :: #pkgid{}.
 -export_type([pkgid/0]).
 
@@ -84,22 +77,30 @@ matches(#pkgid{}=P1, #pkgid{}=P2) ->
   ).
 
 pkgid_match_spec(#pkgid{ author=A1, pkg_name=N1, platform=P1
-                                  , vsn=V1, erlang_vsn=E1}) ->
-  ets:fun2ms(
-    fun(Pkg) when ?IS_PKG(Pkg) ->
-      Id = pkg:id(Pkg),
-      A2 = pkgid:author(Id),
-      N2 = pkgid:pkg_name(Id),
-      P2 = pkgid:platform(Id),
-      V2 = pkgid:vsn(Id),
-      E2 = pkgid:erlang_vsn(Id),
-      (N1 =:= N2
-        andalso (A1 =:= A2 orelse A1 =:= ?any_author)
-        andalso (V1 =:= V2 orelse V1 =:= ?any_vsn)
-        andalso (E1 =:= E2 orelse E1 =:= ?any_erlang_vsn)
-        andalso (P1 =:= P2 orelse P1 =:= ?any_platform)
-      )
-    end).
+                       , vsn=V1, erlang_vsn=E1}) ->
+  ets:fun2ms(fun(#pkg{id=#pkgid{ author=A2, pkg_name=N2, platform=P2
+                                          , vsn=V2, erlang_vsn=E2}}=Pkg)
+    when (N1 =:= N2
+    andalso (A1 =:= A2 orelse A1 =:= ?any_author)
+    andalso (V1 =:= V2 orelse V1 =:= ?any_vsn)
+    andalso (E1 =:= E2 orelse E1 =:= ?any_erlang_vsn)
+    andalso (P1 =:= P2 orelse P1 =:= ?any_platform)
+         ) -> Pkg end).
+%%   ets:fun2ms(
+%%     fun(Pkg) when ?IS_PKG(Pkg) ->
+%%       Id = pkg:id(Pkg),
+%%       A2 = pkgid:author(Id),
+%%       N2 = pkgid:pkg_name(Id),
+%%       P2 = pkgid:platform(Id),
+%%       V2 = pkgid:vsn(Id),
+%%       E2 = pkgid:erlang_vsn(Id),
+%%       (N1 =:= N2
+%%         andalso (A1 =:= A2 orelse A1 =:= ?any_author)
+%%         andalso (V1 =:= V2 orelse V1 =:= ?any_vsn)
+%%         andalso (E1 =:= E2 orelse E1 =:= ?any_erlang_vsn)
+%%         andalso (P1 =:= P2 orelse P1 =:= ?any_platform)
+%%       )
+%%     end).
 
 %%%-----------------------------------------------------------------------------
 fixture_(A, N, V) -> #pkgid{author=A, pkg_name=N, vsn=V}.

@@ -4,7 +4,6 @@
         , as_string/1]).
 
 -include("epm.hrl").
--include_lib("stdlib/include/ms_transform.hrl").
 
 start() ->
   %% Debug
@@ -31,7 +30,7 @@ main_internal(Args) ->
   epm_cfg:init(EpmHome),
   State = epm_index:open(EpmHome),
   setup_proxy(),
-  epm_core:execute(State, Args).
+  epm_command_line:execute(State, Args).
 
 setup_proxy() ->
   epm_util:set_http_proxy( epm_cfg:get(proxy_host, none)
@@ -67,6 +66,8 @@ setup_proxy() ->
 %%   Pkgid#pkgid{args = [Arg | lists:delete(Arg, Args)]}.
 
 %%------------------------------------------------------------------------------
+as_string(Pkg) when ?IS_PKG(Pkg) -> pkg:as_string(Pkg);
+as_string(Pkgid) when ?IS_PKGID(Pkgid) -> pkgid:as_string(Pkgid);
 as_string(#repo{id=I, description=_D, url=U}) ->
   s("[Repo ~s url=~s]", [I, U]);
 as_string(#repoid{name=N}) ->

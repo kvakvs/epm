@@ -1,4 +1,4 @@
--module(epm_core).
+-module(epm_command_line).
 -export([execute/2]).
 
 -include("epm.hrl").
@@ -37,13 +37,13 @@ execute(State=#epm_state{}, ["remove" | Args]) ->
   Installed = epm_ops:get_installed_packages(Packages),
   case Installed of
     [] ->
-      io:format("+ nothing to remove: no matching packages installed~n");
+      epm:p("+ nothing to remove: no matching packages installed~n");
     _ ->
-      io:format("===============================~n"),
-      io:format("Remove the following packages?~n"),
-      io:format("===============================~n"),
-      [io:format("    + ~s~n", [epm:as_string(P)]) || P <- Installed],
-      io:format("~n([y]/n) "),
+      epm:p("===============================~n"
+            "Remove the following packages?~n"
+            "===============================~n"),
+      [epm:p("    + ~s~n", [epm:as_string(P)]) || P <- Installed],
+      epm:p(white, "~n([y]/n) "),
       case io:get_chars("", 1) of
         C when C == "y"; C == "\n" ->
           io:format("~n"),
@@ -59,13 +59,13 @@ execute(State=#epm_state{}, ["update" | Args]) ->
   Installed = epm_ops:get_installed_packages(Packages),
   case Installed of
     [] ->
-      io:format("- nothing to update~n");
+      epm:p("- nothing to update~n");
     _ ->
-      io:format("===============================~n"),
-      io:format("Update the following packages?~n"),
-      io:format("===============================~n"),
-      [io:format("    + ~s~n", [epm:as_string(P)]) || P <- Installed],
-      io:format("~n([y]/n) "),
+      epm:p("===============================~n"
+            "Update the following packages?~n"
+            "===============================~n"),
+      [epm:p("    + ~s~n", [epm:as_string(P)]) || P <- Installed],
+      epm:p(white, "~n([y]/n) "),
       case io:get_chars("", 1) of
         C when C == "y"; C == "\n" ->
           io:format("~n"),
@@ -81,14 +81,14 @@ execute(State=#epm_state{}, ["info" | Args]) ->
   case Installed of
     [] -> ok;
     _ ->
-      io:format("===============================~n"),
-      io:format("INSTALLED~n"),
-      io:format("===============================~n"),
+      epm:p("===============================~n"
+            "INSTALLED~n"
+            "===============================~n"),
 
       F = fun(Package, Count) when ?IS_PKG(Package) ->
             case Count of
               0 -> ok;
-              _ -> io:format("~n")
+              _ -> epm:p("~n")
             end,
             epm_ops:print_installed_package_info(Package),
             Count + 1
@@ -101,7 +101,7 @@ execute(State=#epm_state{}, ["info" | Args]) ->
     _ ->
       case Installed of
         [] -> ok;
-        _ -> io:format("~n")
+        _ -> epm:p("~n")
       end,
       epm_ops:print_not_installed_package_info(State, NotInstalled, true)
   end;
@@ -260,7 +260,8 @@ collect_args_internal(Target, [Arg | Rest], Pkgids, Flags) ->
               [K, V1] = Vals1,
               K1 = list_to_atom(K),
               case K1 of
-                 repo_plugins -> epm_cfg:set(K1, epm_util:eval(V1 ++ "."));
+                 repo_plugins ->
+                   epm_cfg:set(K1, epm_util:parse_erlang_term(V1 ++ "."));
                  _ -> ok
               end;
             true -> ok

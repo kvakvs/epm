@@ -14,14 +14,8 @@
         , as_string/1]).
 
 -include("epm.hrl").
+-include("epm_private_records.hrl").
 
-%% Package: Does not specify branches/tags as this info is queried from package
-%% repository online.
--record(pkg, { id=erlang:error(id_not_set) :: pkgid:pkgid()
-             , deps=[] :: [pkgid:pkgid()]
-             , args=[] :: list()
-             , repo=erlang:error(repo_not_set) :: repoid()
-             }).
 -type pkg() :: #pkg{}.
 -export_type([pkg/0]).
 

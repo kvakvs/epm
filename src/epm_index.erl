@@ -89,11 +89,11 @@ list_global_packages() ->
 
 %% @doc Search local index (installed)
 list_local_matching(Pkgid) when ?IS_PKGID(Pkgid) ->
-  Q = epm:pkgid_match_spec(Pkgid),
+  Q = pkgid:pkgid_match_spec(Pkgid),
   ets:select(?local_pkgs, Q).
 
 list_global_matching(Pkgid) when ?IS_PKGID(Pkgid) ->
-  Q = epm:pkgid_match_spec(Pkgid),
+  Q = pkgid:pkgid_match_spec(Pkgid),
   ets:select(?global_pkgs, Q).
 
 delete_local(Key={_User, _Name, _Vsn}) ->

@@ -23,7 +23,7 @@ get_source(Pkg, DestDir) when ?IS_PKG(Pkg) ->
       ?EPM_FAIL("[index error] repository was set, but not found for package ~s"
                , [epm:as_string(Pkg)]);
     Repo ->
-      epm:p("repo ~p", [Repo]),
+      %% epm:p("[debug] repo ~p~n", [Repo]),
       ApiMod = Repo#repo.api_module,
       ApiMod:get_source(Pkg, DestDir)
   end.

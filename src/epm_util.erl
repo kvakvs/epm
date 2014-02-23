@@ -1,9 +1,9 @@
 -module(epm_util).
 -include("epm.hrl").
 
--export([ git/1
+-export([git/1
         , home_dir/0, epm_home_dir/1, set_net_timeout/1, set_http_proxy/2
-        ]).
+        , parse_erlang_term/1]).
 
 git(Params) ->
   os:cmd(string:join(["git"|Params], " ")) .
@@ -94,19 +94,19 @@ epm_home_dir(Home) ->
       end
   end.
 
-%% %% TODO: Bleeding eyes
-%% eval(Str) ->
-%%   case erl_scan:string(Str) of
-%%     {ok, Tokens, _} ->
-%%       case erl_parse:parse_exprs(Tokens) of
-%%         {ok, Forms} ->
-%%           {value, Terms, _} = erl_eval:exprs(Forms, []),
-%%           Terms;
-%%         _ -> error
-%%       end;
-%%     _ -> error
-%%   end.
-%%
+%% TODO: Bleeding eyes
+parse_erlang_term(Str) ->
+  case erl_scan:string(Str) of
+    {ok, Tokens, _} ->
+      case erl_parse:parse_exprs(Tokens) of
+        {ok, Forms} ->
+          {value, Terms, _} = erl_eval:exprs(Forms, []),
+          Terms;
+        _ -> error
+      end;
+    _ -> error
+  end.
+
 %% %% TODO: Bleeding eyes
 %% add_to_path(InstallDir) ->
 %%   case file:list_dir(InstallDir) of

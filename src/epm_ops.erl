@@ -248,16 +248,16 @@ print_not_installed_internal(Packages, RepoPlugins, IsExact) ->
             0 -> ok;
             _ -> io:format("~n")
           end,
-          io:format("~s~n", [epm:as_string(Repo)]),
+          epm:p("~s~n", [epm:as_string(Repo)]),
           if Tags =/= [] ->
-              io:format("  tags:~n"),
-              [io:format("    ~s~n", [Tag]) || Tag <- Tags];
+              epm:p("  tags:~n"),
+              [epm:p("    ~s~n", [Tag]) || Tag <- Tags];
             true -> ok
           end,
           if
             Branches =/= [] ->
-              io:format("  branches:~n"),
-              [io:format("    ~s~n", [Branch]) || Branch <- Branches];
+              epm:p("  branches:~n"),
+              [epm:p("    ~s~n", [Branch]) || Branch <- Branches];
             true -> ok
           end,
           Count + 1
@@ -282,7 +282,7 @@ fetch_not_installed_package_info([Pkg | Tail]
 %% -----------------------------------------------------------------------------
 -spec remove_package(#epm_state{}, pkgid:pkgid()) -> #epm_state{}.
 remove_package(State=#epm_state{}, Pkgid) when ?IS_PKGID(Pkgid) ->
-  io:format("+ removing package ~s~n" , [epm:as_string(Pkgid)]),
+  epm:p("+ removing package ~s~n" , [epm:as_string(Pkgid)]),
   %RemoveCmd = "rm -rf " ++ InstallDir,
   %epm_util:print_cmd_output("~s~n", [RemoveCmd]),
   %epm_util:do_cmd(RemoveCmd, fail),
@@ -294,7 +294,7 @@ remove_package(State=#epm_state{}, Pkgid) when ?IS_PKGID(Pkgid) ->
 %% -----------------------------------------------------------------------------
 -spec update_package(#epm_state{}, pkgid:pkgid()) -> #epm_state{}.
 update_package(State=#epm_state{}, Pkgid) when ?IS_PKGID(Pkgid) ->
-  io:format("+ updating package ~s~n" , [pkgid:as_string(Pkgid)]),
+  epm:p("+ updating package ~s~n" , [pkgid:as_string(Pkgid)]),
   %Repo = Package#pkg.repo,
   %Vsn = Package#pkg.vsn,
   %% switch to build home dir
