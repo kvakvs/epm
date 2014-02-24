@@ -63,9 +63,7 @@ open(EpmHome) ->
   ets:insert(?global_pkgs, pkg:fixture_(FwId, [], Github)),
 
   %ets:insert(?local_pkgs, #pkg{id=GunId}),
-
-  State = #epm_state{},
-  State.
+  ok.
 
 get_repo(Id=#repoid{}) ->
   case ets:lookup(?global_repos, Id) of

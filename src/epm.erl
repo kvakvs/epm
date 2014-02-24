@@ -28,9 +28,9 @@ main_internal(Args) ->
   Home = epm_util:home_dir(),
   EpmHome = epm_util:epm_home_dir(Home),
   epm_cfg:init(EpmHome),
-  State = epm_index:open(EpmHome),
+  ok = epm_index:open(EpmHome),
   setup_proxy(),
-  epm_command_line:execute(State, Args).
+  epm_command_line:execute(Args).
 
 setup_proxy() ->
   epm_util:set_http_proxy( epm_cfg:get(proxy_host, none)

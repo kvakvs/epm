@@ -1,0 +1,15 @@
+{
+  "package": {
+    "pkg_name": "pkg1",
+    "author": "me",
+    "vsn": "1.0",
+    "platform": "any",
+    "erlang_vsn": { "op": "greater", "value": 1500 }
+  },
+  "depends": [
+    {"name": "cowboy", "author": "extend", "repo": "github"}
+  ],
+  "build": {
+    "linux": [ "make" ]
+  }
+}

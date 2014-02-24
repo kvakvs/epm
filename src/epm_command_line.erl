@@ -1,9 +1,15 @@
 -module(epm_command_line).
--export([execute/2]).
+-export([execute/1]).
 
 -include("epm.hrl").
 
-execute(State=#epm_state{}, ["install" | Args]) ->
+-type command() :: install | wrap | remove | update | config | info | search.
+
+execute(["install" | Args]) ->
+  {_Pkgids, Flags} = collect_args(wrap, Args),
+  epm_cfg:set(verbose, lists:member(verbose, Flags)),
+  ok;
+execute(["install" | Args]) ->
   {Pkgids, Flags} = collect_args(install, Args),
   epm_cfg:set(verbose, lists:member(verbose, Flags)),
 
@@ -25,13 +31,11 @@ execute(State=#epm_state{}, ["install" | Args]) ->
       [epm:p("    + ~s~n", [epm:as_string(P)]) || P <- NotInstalled],
       case io:get_chars("", 1) of
         C when C == "y"; C == "\n" ->
-          lists:foldl(fun(X, St) -> epm_ops:install_package(St, X) end
-                     , State, NotInstalled);
+          lists:map(fun epm_ops:install_package/1, NotInstalled);
         _ -> ok
       end
   end;
-
-execute(State=#epm_state{}, ["remove" | Args]) ->
+execute(["remove" | Args]) ->
   {Packages, Flags} = collect_args(remove, Args),
   epm_cfg:set(verbose, lists:member(verbose, Flags)),
   Installed = epm_ops:get_installed_packages(Packages),
@@ -47,13 +51,11 @@ execute(State=#epm_state{}, ["remove" | Args]) ->
       case io:get_chars("", 1) of
         C when C == "y"; C == "\n" ->
           io:format("~n"),
-          lists:foldl(fun(X, St) -> epm_ops:remove_package(St, X) end
-                     , State, Installed);
+          lists:map(fun epm_ops:remove_package/1, Installed);
         _ -> ok
       end
   end;
-
-execute(State=#epm_state{}, ["update" | Args]) ->
+execute(["update" | Args]) ->
   {Packages, Flags} = collect_args(update, Args),
   epm_cfg:set(verbose, lists:member(verbose, Flags)),
   Installed = epm_ops:get_installed_packages(Packages),
@@ -69,13 +71,11 @@ execute(State=#epm_state{}, ["update" | Args]) ->
       case io:get_chars("", 1) of
         C when C == "y"; C == "\n" ->
           io:format("~n"),
-          lists:foldl(fun(X, St) -> epm_ops:update_package(St, X) end
-                     , State, Installed);
+          lists:map(fun epm_ops:update_package/1, Installed);
         _ -> ok
       end
   end;
-
-execute(State=#epm_state{}, ["info" | Args]) ->
+execute(["info" | Args]) ->
   {Packages, _Flags} = collect_args(info, Args),
   {Installed, NotInstalled} = epm_ops:filter_installed_packages(Packages),
   case Installed of
@@ -103,38 +103,33 @@ execute(State=#epm_state{}, ["info" | Args]) ->
         [] -> ok;
         _ -> epm:p("~n")
       end,
-      epm_ops:print_not_installed_package_info(State, NotInstalled, true)
+      epm_ops:print_not_installed_package_info(NotInstalled, true)
   end;
-
-execute(State=#epm_state{}, ["search" | Args]) ->
+execute(["search" | Args]) ->
   {Packages, _Flags} = collect_args(search, Args),
-  epm_ops:print_not_installed_package_info(State, lists:reverse(Packages));
-
-execute(State=#epm_state{}, ["list" | _Args]) ->
-  Installed = epm_ops:installed_packages(State),
+  epm_ops:print_not_installed_package_info(lists:reverse(Packages));
+execute(["list" | _Args]) ->
+  Installed = epm_ops:installed_packages(),
   case Installed of
     [] ->
-      io:format("- no packages installed~n");
+      epm:p("- no packages installed~n");
     _ ->
-      io:format("===============================~n"),
-      io:format("INSTALLED~n"),
-      io:format("===============================~n"),
+      epm:p("===============================~n"
+            "INSTALLED~n"
+            "===============================~n"),
 
       F = fun(Package, Count) ->
           case Count of
             0 -> ok;
-            _ -> io:format("~n")
+            _ -> epm:p("~n")
           end,
           epm_ops:print_installed_package_info(Package),
           Count + 1
         end,
       lists:foldl(F, 0, lists:reverse(Installed))
   end;
-
-execute(State=#epm_state{}, ["latest" | _Args]) ->
-	update_epm(State);
-
-execute(_State=#epm_state{}, ["config" | Args]) ->
+execute(["latest" | _Args]) -> epm_ops:update_epm();
+execute(["config" | Args]) ->
   {_Packages, Flags} = collect_args(config, Args),
   case Flags of
     [] ->
@@ -149,13 +144,16 @@ execute(_State=#epm_state{}, ["config" | Args]) ->
       _ = lists:foreach(F, Flags),
       epm_cfg:write_config_file()
   end;
-
-execute(_State=#epm_state{}, _) ->
-  epm:p("Usage: epm commands~n~n"
-        "    install [<author>/]<project> {project options}, ... {global options}~n"
-        "        project options:~n"
-        "             --source :: requests source install (does not build)~n"
-        "             --platform x86|x64, --vsn <v>, --tag <t>, --branch <b>, --hash <h>~n"
+execute(_) ->
+  epm:p("Usage: epm commands~n"
+  %------------------------------
+  "    install [<author>/]<project> {project options}, ... {global options}~n"
+  "      project options:~n"
+  "        --source :: request source install~n"
+  "        --platform x86|x64, --vsn <v>, --tag <t>, --branch <b>, --hash <h>~n"
+  %------------------------------
+  "    wrap [path] -- looks for epm.json in 'path' and wraps an package zip~n"
+  %------------------------------
 %%         "             --with-deps (default)~n"
 %%         "             --without-deps~n"
 %%         "             --prebuild-command <cmd>~n"
@@ -200,9 +198,9 @@ execute(_State=#epm_state{}, _) ->
 %% -----------------------------------------------------------------------------
 %% parse input args
 %% -----------------------------------------------------------------------------
-
--spec collect_args(Target :: atom(), Args :: [string()])
-      -> {[pkgid:pkgid()], [atom()]}.
+-spec collect_args( Target :: command()
+                  , Args :: [string()]
+                  ) -> {[pkgid:pkgid()], [atom()]}.
 collect_args(Target, Args) ->
   collect_args_internal(Target, Args, [], []).
 
@@ -270,11 +268,9 @@ collect_args_internal(Target, [Arg | Rest], Pkgids, Flags) ->
       end
   end.
 
-%% @spec parse_tag(Target, Arg) -> {Tag, HasValue} | undefined
-%%		 Target = atom()
-%%		 Arg = string()
-%%		 Tag = atom()
-%%		 HasValue = bool()
+-spec parse_tag( Target :: command()
+               , Arg :: string()
+               ) -> {Tag :: atom(), HasValue :: bool} | undefined.
 parse_tag(install, "--source") -> {project, source, 0};
 parse_tag(install, "--tag") -> {project, tag, 1};
 parse_tag(install, "--branch") -> {project, branch, 1};
@@ -297,34 +293,6 @@ parse_tag(_, "--verbose") -> {global, verbose, 0};
 parse_tag(_, "--config-set") -> {global, config_set, 2};
 
 parse_tag(_, _) -> undefined.
-
-%% -----------------------------------------------------------------------------
-%% Replace epm script with most recent
-%% -----------------------------------------------------------------------------
-update_epm(_State) ->
-  File =
-    case os:find_executable("epm") of
-      false ->
-        case filelib:is_regular("epm") of
-          true  -> "./epm";
-          false -> exit("failed to find epm executable to replace")
-        end;
-      F -> F
-    end,
-  Fork = proplists:get_value(epm_fork, application:get_all_env(epm), "JacobVorreuter"),
-  Url = "http://github.com/" ++ Fork ++ "/epm/raw/master/epm",
-  case epm_util:http_request(Url, [{"Host", "github.com"}], [{body_format, binary}]) of
-    {ok, {{_, 200, _}, _, Body}} ->
-      case file:write_file(File, Body) of
-        ok ->
-          epm:p("+ updated epm (~s) to latest version~n", [File]);
-        {error, Reason} ->
-          exit(lists:flatten(io_lib:format("failed to overwrite epm executable ~s: ~p~n", [File, Reason])))
-      end;
-    _ ->
-      exit("failed to download latest version of epm")
-  end.
-
 
 
 %% build_project(GlobalConfig, Package) ->

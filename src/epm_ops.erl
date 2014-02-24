@@ -7,20 +7,20 @@
 -module(epm_ops).
 
 %% API
--export([filter_installed_packages/1
-%%         , retrieve_remote_repo/3
-%%         , retrieve_remote_repos/4
-        , installed_packages/1
-        , get_installed_packages/1
-        , split_package/1 % remove this?
+-export([ filter_installed_packages/1
         , read_vsn_from_args/2
         , print_installed_package_info/1
-        , print_not_installed_package_info/2
-        , print_not_installed_package_info/3
-        , update_package/2
-        , remove_package/2
-        , install_package/2
-        %, install/3
+        , print_not_installed_package_info/1
+        %, print_not_installed_package_info/2
+        , update_package/1
+        , remove_package/1
+        , install_package/1
+        , wrap_package/1
+        , update_epm/0
+        ]).
+-export([ installed_packages/1 % move this to index
+        , get_installed_packages/1 % move this to index
+        , split_package/1 % move this to util
         ]).
 
 -include("epm.hrl").
@@ -50,15 +50,17 @@ filter_installed_packages(Pkgids) ->
 %%   end.
 
 
+%% TODO: move this to util or elsewhere
 split_package(Raw) -> split_package(Raw, []).
 split_package([], Package) -> {Package, ?any_author};
 split_package([47 | Package], Author) -> {Package, Author};
 split_package([A | Tail], Author) -> split_package(Tail, Author ++ [A]).
 
-
+%% TODO: move this to index or elsewhere
 installed_packages(_State=#epm_state{}) ->
   [Package || [{_,Package}] <- epm_index:list_local_packages()].
 
+%% TODO: move this to index or elsewhere
 get_installed_packages(_Packages) ->
   [].
 %%   Installed = dict:to_list(installed_packages_internal(Packages, dict:new())),
@@ -223,10 +225,10 @@ print_installed_package_info(Package) when ?IS_PKG(Package) ->
         [string:join(lists:map(fun epm:as_string/1, Deps), "\n  ")])
   end.
 
-print_not_installed_package_info(State=#epm_state{}, Packages) ->
-  print_not_installed_package_info(State, Packages, false).
+print_not_installed_package_info(Packages) ->
+  print_not_installed_package_info(Packages, false).
 
-print_not_installed_package_info(_State=#epm_state{}, Packages, IsExact) ->
+print_not_installed_package_info(Packages, IsExact) ->
   RepoPlugins = epm_cfg:get(repo_plugins, ?DEFAULT_API_MODULES),
   print_not_installed_internal(Packages, RepoPlugins, IsExact).
 
@@ -235,33 +237,27 @@ print_not_installed_internal(Packages, RepoPlugins, IsExact) ->
     [] ->
       io:format("- not found~n");
     Repos ->
-      io:format("===============================~n"),
-      io:format("AVAILABLE~n"),
-      io:format("===============================~n"),
-      lists:foldl(
-        fun(Repo, Count) ->
-          Tags = [],
-%apply(Repo#repo.api_module, tags, [Repo#repo.owner, Repo#repo.name]),
-          Branches = [],
-%apply(Repo#repo.api_module, branches, [Repo#repo.owner, Repo#repo.name]),
-          case Count of
-            0 -> ok;
-            _ -> io:format("~n")
-          end,
+      epm:p("===============================~n"
+            "AVAILABLE~n"
+            "===============================~n"),
+      F = fun(Repo, Count) ->
+          Tags = [], %apply(Repo#repo.api_module, tags, [Repo#repo.owner, Repo#repo.name]),
+          Branches = [], %apply(Repo#repo.api_module, branches, [Repo#repo.owner, Repo#repo.name]),
+          case Count of 0 -> ok; _ -> io:format("~n") end,
           epm:p("~s~n", [epm:as_string(Repo)]),
           if Tags =/= [] ->
-              epm:p("  tags:~n"),
-              [epm:p("    ~s~n", [Tag]) || Tag <- Tags];
+            epm:p("  tags:~n"),
+            [epm:p("    ~s~n", [Tag]) || Tag <- Tags];
             true -> ok
           end,
-          if
-            Branches =/= [] ->
+          if Branches =/= [] ->
               epm:p("  branches:~n"),
               [epm:p("    ~s~n", [Branch]) || Branch <- Branches];
             true -> ok
           end,
           Count + 1
-        end      , 0, Repos)
+        end,
+      lists:foldl(F, 0, Repos)
   end.
 
 fetch_not_installed_package_info([], _, Acc, _) -> Acc;
@@ -280,109 +276,68 @@ fetch_not_installed_package_info([Pkg | Tail]
 %% -----------------------------------------------------------------------------
 %% REMOVE
 %% -----------------------------------------------------------------------------
--spec remove_package(#epm_state{}, pkgid:pkgid()) -> #epm_state{}.
-remove_package(State=#epm_state{}, Pkgid) when ?IS_PKGID(Pkgid) ->
+-spec remove_package(pkgid:pkgid()) -> ok.
+remove_package(Pkgid) when ?IS_PKGID(Pkgid) ->
   epm:p("+ removing package ~s~n" , [epm:as_string(Pkgid)]),
   %RemoveCmd = "rm -rf " ++ InstallDir,
   %epm_util:print_cmd_output("~s~n", [RemoveCmd]),
   %epm_util:do_cmd(RemoveCmd, fail),
   %epm_index:delete_local({User, Name, Vsn}),
-  State.
+  ok.
 
 %% -----------------------------------------------------------------------------
 %% UPDATE
 %% -----------------------------------------------------------------------------
--spec update_package(#epm_state{}, pkgid:pkgid()) -> #epm_state{}.
-update_package(State=#epm_state{}, Pkgid) when ?IS_PKGID(Pkgid) ->
+-spec update_package(pkgid:pkgid()) -> ok.
+update_package(Pkgid) when ?IS_PKGID(Pkgid) ->
   epm:p("+ updating package ~s~n" , [pkgid:as_string(Pkgid)]),
-  %Repo = Package#pkg.repo,
-  %Vsn = Package#pkg.vsn,
-  %% switch to build home dir
-  %epm_util:set_cwd_build_home(State),
-
-  %% download correct version of package
-  %LocalProjectDir = apply(Repo#repo.api_module, download_package
-  %                       , [Repo, Vsn]),
-
-  %% switch to project dir
-  %epm_util:set_cwd_build_home(State),
-  %epm_util:set_cwd(LocalProjectDir),
-
-  %% build/install project
-  %_InstallDir = build_project(GlobalConfig, Package),
-
-  %% switch to build home dir and delete cloned project
-  %epm_util:set_cwd_build_home(State),
-  %epm_util:del_dir(LocalProjectDir),
-  State.
-
+  ok.
 
 %% -----------------------------------------------------------------------------
 %% INSTALL
 %% -----------------------------------------------------------------------------
--spec install_package(#epm_state{}, pkgid:pkgid()) -> #epm_state{}.
-install_package(State=#epm_state{}, Pkgid) when ?IS_PKGID(Pkgid) ->
+-spec install_package(pkgid:pkgid()) -> ok.
+install_package(Pkgid) when ?IS_PKGID(Pkgid) ->
   epm:p("+ searching to install ~s~n" , [epm:as_string(Pkgid)]),
   PkgList = epm_index:list_global_matching(Pkgid),
   epm:p("  available: ~s~n",
     [string:join(lists:map(fun epm:as_string/1, PkgList), "; ")]),
+
   %% Fetch the package
-  %% TODO: Binary packages
   Preferred = epm_deps:preferred_package(PkgList, Pkgid),
   epm_vcs:get_source(Preferred, "deps"),
+  ok.
 
-  %Repo = Package#pkg.repo,
-  %User = Repo#repo.owner,
-  %Name = Repo#repo.name,
-  %Vsn = Package#pkg.vsn,
-  %% switch to build home dir
-  %epm_util:set_cwd_build_home(State),
+%% -----------------------------------------------------------------------------
+%% WRAP UP THE PACKAGE
+%% -----------------------------------------------------------------------------
+-spec wrap_package(Path :: string()) -> ok.
+wrap_package(_Path) ->
+  ok.
 
-  %% download correct version of package
-  %LocalProjectDir = apply(Repo#repo.api_module, download_package, [Repo, Vsn]),
-
-  %% switch to project dir
-  %epm_util:set_cwd_build_home(State),
-  %epm_util:set_cwd(LocalProjectDir),
-
-  %% build/install project
-  %InstallDir = "not-building-anything", %build_project(State, Package),
-
-  %% switch to build home dir and delete cloned project
-  %epm_util:set_cwd_build_home(State),
-  %epm_util:del_dir(LocalProjectDir),
-
-  %Package1 = Package#pkg{install_dir = InstallDir},
-  %epm_index:insert_local({User, Name, Vsn}, Package1),
-  State.
-
-%%---------------------------------------------------------------------------
-%% install(ProjectName, Config, undefined) ->
-%%   install(ProjectName, Config, code:lib_dir());
-%%
-%% install(ProjectName, _Config, LibDir) ->
-%%   Vsn =
-%%     case file:consult("ebin/" ++ ProjectName ++ ".app") of
-%%       {ok, [{application, _, Props}]} ->
-%%         proplists:get_value(vsn, Props);
-%%       _ ->
-%%         undefined
-%%     end,
-%%   Dir =
-%%     case Vsn of
-%%       undefined -> LibDir ++ "/" ++ ProjectName;
-%%       _ -> LibDir ++ "/" ++ ProjectName ++ "-" ++ Vsn
-%%     end,
-%%   InstallCmd = "mkdir -p " ++ Dir ++ "; cp -R ./* " ++ Dir,
-%%   io:format("+ running ~s install command~n", [ProjectName]),
-%%   epm_util:print_cmd_output("~s~n", [InstallCmd]),
-%%   epm_util:do_cmd(InstallCmd, fail),
-%%   Ebin = Dir ++ "/ebin",
-%%   case code:add_pathz(Ebin) of
-%%     true -> ok;
-%%     Err  ->
-%%       M = io_lib:format("failed to add path for ~s (~s): ~p"
-%%                        , [ProjectName, Ebin, Err]),
-%%       exit(lists:flatten(M))
-%%   end,
-%%   Dir.
+%% -----------------------------------------------------------------------------
+%% Replace epm script with most recent
+%% -----------------------------------------------------------------------------
+update_epm() ->
+  File =
+    case os:find_executable("epm") of
+      false ->
+        case filelib:is_regular("epm") of
+          true  -> "./epm";
+          false -> exit("failed to find epm executable to replace")
+        end;
+      F -> F
+    end,
+  Fork = proplists:get_value(epm_fork, application:get_all_env(epm), "JacobVorreuter"),
+  Url = "http://github.com/" ++ Fork ++ "/epm/raw/master/epm",
+  case epm_util:http_request(Url, [{"Host", "github.com"}], [{body_format, binary}]) of
+    {ok, {{_, 200, _}, _, Body}} ->
+      case file:write_file(File, Body) of
+        ok ->
+          epm:p("+ updated epm (~s) to latest version~n", [File]);
+        {error, Reason} ->
+          exit(lists:flatten(io_lib:format("failed to overwrite epm executable ~s: ~p~n", [File, Reason])))
+      end;
+    _ ->
+      exit("failed to download latest version of epm")
+  end.
